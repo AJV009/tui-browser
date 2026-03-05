@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>TUI Browser</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #1a1a2e;
+      color: #e0e0e0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    #toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: #16213e;
+      border-bottom: 1px solid #0f3460;
+      flex-shrink: 0;
+      flex-wrap: wrap;
+    }
+
+    #toolbar label {
+      font-size: 13px;
+      color: #a0a0b8;
+      white-space: nowrap;
+    }
+
+    #url {
+      flex: 1;
+      min-width: 200px;
+      padding: 6px 10px;
+      background: #0f3460;
+      border: 1px solid #1a4a7a;
+      border-radius: 4px;
+      color: #e0e0e0;
+      font-family: 'JetBrains Mono', 'Fira Code', monospace;
+      font-size: 13px;
+      outline: none;
+    }
+
+    #url:focus { border-color: #e94560; }
+
+    #connect-btn {
+      padding: 6px 16px;
+      background: #e94560;
+      border: none;
+      border-radius: 4px;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    #connect-btn:hover { background: #c73550; }
+    #connect-btn.connected { background: #533; }
+    #connect-btn.connected:hover { background: #744; }
+
+    #status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: #a0a0b8;
+      white-space: nowrap;
+    }
+
+    #status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #555;
+      transition: background 0.3s;
+    }
+
+    #status-dot.connected { background: #4caf50; }
+    #status-dot.connecting { background: #ff9800; }
+    #status-dot.error { background: #e94560; }
+
+    #terminal-container {
+      flex: 1;
+      padding: 4px;
+      overflow: hidden;
+    }
+
+    #terminal-container .xterm {
+      height: 100%;
+    }
+
+    #footer {
+      padding: 6px 12px;
+      background: #16213e;
+      border-top: 1px solid #0f3460;
+      font-size: 11px;
+      color: #666;
+      flex-shrink: 0;
+    }
+
+    #footer code {
+      background: #0f3460;
+      padding: 1px 5px;
+      border-radius: 3px;
+      color: #a0a0b8;
+    }
+  </style>
+</head>
+<body>
+  <div id="toolbar">
+    <label for="url">Server:</label>
+    <input id="url" type="text" placeholder="ws://localhost:3000" spellcheck="false">
+    <button id="connect-btn" onclick="toggleConnection()">Connect</button>
+    <div id="status">
+      <span id="status-dot"></span>
+      <span id="status-text">Disconnected</span>
+    </div>
+  </div>
+
+  <div id="terminal-container"></div>
+
+  <div id="footer">
+    Quick start: <code>node server.js</code> then connect to
+    <code>ws://localhost:3000</code>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-webgl@0.18.0/lib/addon-webgl.min.js"></script>
+  <script>
+    const urlInput = document.getElementById('url');
+    const connectBtn = document.getElementById('connect-btn');
+    const statusDot = document.getElementById('status-dot');
+    const statusText = document.getElementById('status-text');
+    const container = document.getElementById('terminal-container');
+
+    let ws = null;
+    let term = null;
+    let fitAddon = null;
+    let reconnectTimer = null;
+    let reconnectDelay = 1000;
+    const MAX_RECONNECT_DELAY = 16000;
+
+    // Restore state from URL hash
+    function loadHash() {
+      const params = new URLSearchParams(window.location.hash.slice(1));
+      if (params.get('url')) urlInput.value = params.get('url');
+    }
+
+    function saveHash() {
+      const params = new URLSearchParams();
+      params.set('url', urlInput.value);
+      window.location.hash = params.toString();
+    }
+
+    function setStatus(state, text) {
+      statusDot.className = state;
+      statusText.textContent = text;
+      connectBtn.textContent = state === 'connected' ? 'Disconnect' : 'Connect';
+      connectBtn.className = state === 'connected' ? 'connected' : '';
+    }
+
+    function initTerminal() {
+      if (term) { term.dispose(); }
+
+      term = new Terminal({
+        cursorBlink: true,
+        cursorStyle: 'block',
+        fontSize: 14,
+        fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Menlo', monospace",
+        theme: {
+          background: '#1a1a2e',
+          foreground: '#e0e0e0',
+          cursor: '#e94560',
+          selectionBackground: '#e9456044',
+        },
+        allowProposedApi: true,
+        scrollback: 5000,
+      });
+
+      fitAddon = new FitAddon.FitAddon();
+      term.loadAddon(fitAddon);
+
+      term.open(container);
+
+      // Try WebGL, fall back silently
+      try {
+        const webgl = new WebglAddon.WebglAddon();
+        webgl.onContextLoss(() => { webgl.dispose(); });
+        term.loadAddon(webgl);
+      } catch (_) { /* software renderer is fine */ }
+
+      fitAddon.fit();
+      term.writeln('\x1b[1;35m TUI Browser \x1b[0m');
+      term.writeln(' Enter a WebSocket URL above and click Connect.\r\n');
+
+      // Register input handler ONCE — routes through current `ws` ref
+      term.onData((data) => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(data);
+        }
+      });
+    }
+
+    function sendResize(cols, rows) {
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      ws.send(JSON.stringify({ type: 'resize', cols, rows }));
+    }
+
+    function connect() {
+      const url = urlInput.value.trim();
+      if (!url) { urlInput.focus(); return; }
+
+      clearTimeout(reconnectTimer);
+      if (ws) { ws.onclose = null; ws.close(); }
+
+      saveHash();
+      setStatus('connecting', 'Connecting\u2026');
+      term.clear();
+
+      try {
+        ws = new WebSocket(url);
+      } catch (e) {
+        setStatus('error', 'Invalid URL');
+        return;
+      }
+
+      ws.binaryType = 'arraybuffer';
+
+      ws.onopen = () => {
+        setStatus('connected', 'Connected');
+        reconnectDelay = 1000;
+        term.focus();
+        sendResize(term.cols, term.rows);
+      };
+
+      ws.onmessage = (ev) => {
+        if (typeof ev.data === 'string') {
+          term.write(ev.data);
+        } else {
+          term.write(new Uint8Array(ev.data));
+        }
+      };
+
+      ws.onclose = (ev) => {
+        setStatus('error', `Disconnected (${ev.code})`);
+        scheduleReconnect();
+      };
+
+      ws.onerror = () => {
+        setStatus('error', 'Connection error');
+      };
+    }
+
+    function disconnect() {
+      clearTimeout(reconnectTimer);
+      if (ws) {
+        ws.onclose = null;
+        ws.close();
+        ws = null;
+      }
+      setStatus('', 'Disconnected');
+    }
+
+    function toggleConnection() {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        disconnect();
+      } else {
+        connect();
+      }
+    }
+
+    function scheduleReconnect() {
+      reconnectTimer = setTimeout(() => {
+        if (!ws || ws.readyState === WebSocket.CLOSED) {
+          setStatus('connecting', `Reconnecting (${reconnectDelay / 1000}s)\u2026`);
+          connect();
+          reconnectDelay = Math.min(reconnectDelay * 2, MAX_RECONNECT_DELAY);
+        }
+      }, reconnectDelay);
+    }
+
+    // Resize handling
+    window.addEventListener('resize', () => {
+      if (fitAddon) {
+        fitAddon.fit();
+        sendResize(term.cols, term.rows);
+      }
+    });
+
+    // Enter key in URL input triggers connect
+    urlInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') toggleConnection();
+    });
+
+    // Click terminal to focus
+    container.addEventListener('click', () => {
+      if (term) term.focus();
+    });
+
+    // Init
+    loadHash();
+    if (!urlInput.value) urlInput.value = 'ws://localhost:3000';
+    initTerminal();
+  </script>
+</body>
+</html>
