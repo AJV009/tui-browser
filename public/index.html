@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>TUI Browser</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css">
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+
+  <!-- Header -->
+  <div id="header">
+    <h1>TUI Browser</h1>
+    <button id="back-btn" class="nav-btn" style="display:none">Dashboard</button>
+  </div>
+
+  <!-- Dashboard View -->
+  <div id="dashboard-view">
+    <div class="dashboard-content">
+      <div class="dashboard-toolbar">
+        <h2>Sessions</h2>
+        <form id="create-session-form" class="create-form">
+          <input id="new-session-name" type="text" placeholder="Session name" autocomplete="off">
+          <input id="new-session-cmd" type="text" placeholder="Command (default: bash)" autocomplete="off">
+          <button type="submit" class="btn btn-primary">New Session</button>
+        </form>
+      </div>
+      <div id="session-list"></div>
+    </div>
+  </div>
+
+  <!-- Terminal View -->
+  <div id="terminal-view" class="hidden">
+    <div class="terminal-toolbar">
+      <span class="session-label" id="terminal-session-name"></span>
+      <div class="connection-status">
+        <span class="status-dot" id="terminal-status-dot"></span>
+        <span id="terminal-status-text">Disconnected</span>
+      </div>
+    </div>
+    <div id="terminal-container"></div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-webgl@0.18.0/lib/addon-webgl.min.js"></script>
+  <script src="/js/dashboard.js"></script>
+  <script src="/js/terminal.js"></script>
+  <script src="/js/app.js"></script>
+</body>
+</html>
