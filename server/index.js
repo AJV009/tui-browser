@@ -13,6 +13,7 @@ const express = require('express');
 const { WebSocketServer } = require('ws');
 const discovery = require('./discovery');
 const sessions = require('./session-manager');
+const kittyDiscovery = require('./kitty-discovery');
 
 const PORT = parseInt(process.env.PORT || process.argv[2], 10) || 3000;
 
@@ -25,7 +26,8 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 app.get('/api/health', async (_req, res) => {
   const tmuxOk = await discovery.isTmuxAvailable();
   const serverOk = tmuxOk && (await discovery.isTmuxServerRunning());
-  res.json({ tmux: tmuxOk, server: serverOk });
+  const kittyStatus = await kittyDiscovery.isKittyRemoteAvailable();
+  res.json({ tmux: tmuxOk, server: serverOk, kitty: kittyStatus.available });
 });
 
 app.get('/api/sessions', async (_req, res) => {
@@ -69,6 +71,30 @@ app.delete('/api/sessions/:name', async (req, res) => {
   try {
     await sessions.killSession(req.params.name);
     res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Kitty window discovery
+app.get('/api/kitty/windows', async (_req, res) => {
+  try {
+    const result = await kittyDiscovery.discoverKittyWindows();
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Unified discovery — tmux sessions + kitty windows in one call
+app.get('/api/discover', async (_req, res) => {
+  try {
+    const result = await discovery.discoverAll();
+    // annotate tmux sessions with web client counts
+    for (const s of result.tmux) {
+      s.webClients = sessions.getClientCount(s.name);
+    }
+    res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

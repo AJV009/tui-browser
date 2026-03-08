@@ -116,6 +116,23 @@ async function getSessionDetail(sessionName) {
   return session;
 }
 
+/**
+ * Unified discovery — returns tmux sessions + kitty windows in one call.
+ */
+async function discoverAll() {
+  const kittyDiscovery = require('./kitty-discovery');
+
+  const [tmuxSessions, kittyResult] = await Promise.all([
+    listSessions(),
+    kittyDiscovery.discoverKittyWindows(),
+  ]);
+
+  return {
+    tmux: tmuxSessions,
+    kitty: kittyResult,
+  };
+}
+
 module.exports = {
   isTmuxAvailable,
   isTmuxServerRunning,
@@ -123,4 +140,5 @@ module.exports = {
   listPanes,
   capturePane,
   getSessionDetail,
+  discoverAll,
 };
