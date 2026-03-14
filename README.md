@@ -29,10 +29,18 @@ Phone/Tablet/Laptop Browser              Host Machine (Kitty + tmux)
 - **VNC-style mirroring** — browser and Kitty terminal show the exact same content. Type in either, both update.
 - **Unified dashboard** — tmux sessions enriched with Kitty metadata (tab title, focus state, viewer count)
 - **Auto-discovery** — PID matching links Kitty windows to their tmux sessions automatically
-- **Session management** — create, connect, kill sessions from the browser. New sessions also open a Kitty window on the host.
+- **Session management** — create, connect, kill, rename sessions from the browser. New sessions also open a Kitty window on the host.
+- **Session info panel** — live-updating stats: memory, CPU, process tree, uptime, recent terminal output
+- **AI session titles** — uses Claude CLI (haiku) to auto-generate contextual session names from terminal output
+- **Quick Launch** — preset and custom commands saved to `shortcuts.json`, launch sessions in one tap
+- **Session sorting** — sort by newest, oldest, recently active, or least active
+- **Open on PC** — relaunch dangling sessions into a Kitty window from the dashboard
 - **Multi-client** — multiple browsers can connect to the same session
 - **60fps TUI support** — tmux + xterm.js WebGL handles high-frequency rendering (Claude Code, Ratatui apps, etc.)
-- **Mobile-friendly** — responsive grid layout, touch-ready
+- **Mobile-optimized** — quick-keys bar, scroll controls, text selection overlay, keyboard-aware viewport
+- **PWA with auto-update** — installable app, polls server version, auto-reloads on code changes
+- **Online/offline detection** — toast notifications for connectivity changes
+- **Cache-first rendering** — sessions load instantly from cache, no flash on page load or phone wake
 - **Auto-restart** — systemd service with file watcher restarts the server on code changes
 - **Cloudflare Tunnel** — secure remote access via HTTPS with zero port forwarding
 - **Zero build frontend** — vanilla JS, xterm.js from CDN, no bundler
@@ -65,6 +73,7 @@ PORT=7483 npm start
 - **Node.js** >= 18
 - **tmux** >= 3.2 (for `allow-passthrough`)
 - **Kitty** (optional — for host terminal integration)
+- **Claude CLI** (optional — for AI session title generation)
 
 ### Kitty Setup (optional)
 
@@ -165,11 +174,16 @@ systemctl --user stop tui-browser-tunnel
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `GET` | `/api/discover` | Unified discovery (tmux sessions + Kitty windows) |
+| `GET` | `/api/version` | Server version + build ID + claude availability |
 | `GET` | `/api/sessions` | List tmux sessions |
 | `GET` | `/api/sessions/:name` | Session details + preview |
+| `GET` | `/api/sessions/:name/info` | Live session stats (memory, CPU, processes, output) |
 | `POST` | `/api/sessions` | Create session `{ name, command, cwd }` |
 | `DELETE` | `/api/sessions/:name` | Kill session |
 | `POST` | `/api/sessions/:name/rename` | Rename `{ newName }` |
+| `POST` | `/api/sessions/:name/open-terminal` | Open Kitty window for session |
+| `POST` | `/api/sessions/:name/generate-title` | AI-generate session title via Claude CLI |
+| `POST` | `/api/shortcuts` | Add custom shortcut `{ label, command }` |
 | `GET` | `/api/health` | Server + tmux + Kitty status |
 
 ### WebSocket
@@ -211,11 +225,30 @@ tui-browser/
 └── package.json
 ```
 
+## Mobile Controls
+
+The terminal view includes touch-optimized controls:
+
+- **Quick-keys bar** — Esc, Tab, Ctrl+C/D/Z, arrow keys, and a Sel (text select) button
+- **Scroll controls** — floating up/down buttons (top-right) to scroll tmux history via copy-mode
+- **Text selection** — tap Sel to open terminal output in a native-selectable overlay with Copy All
+- **Keyboard awareness** — UI shifts above the soft keyboard automatically
+- **Double-tap** a session card on the dashboard to connect directly
+
 ## tmux Tips
 
 - **Scroll up**: mouse wheel scrolls the buffer when `mouse on` is set in `~/.tmux.conf` (the install script enables this).
 - **Select text**: hold `Shift` while clicking/dragging to use your terminal's native selection — this bypasses tmux's copy mode, which otherwise jumps to the bottom after selecting.
 - **Copy-mode (keyboard)**: `Ctrl+b` then `[` enters copy mode. Use arrow keys / `Page Up` / `Page Down` to scroll. Press `q` to exit.
+
+## AI Session Titles
+
+If the [Claude CLI](https://claude.com/claude-code) is installed, sessions can be auto-titled based on their terminal content:
+
+- **Automatic**: new sessions get a title once they cross 15 lines of output (one-time, uses haiku model)
+- **Manual**: click the sparkle icon next to the session name in terminal view to regenerate
+- **Smart context**: extracts first 150 + last 150 lines of the last command's output (skips the middle for long outputs)
+- **Human-safe**: manually renamed sessions are never auto-overwritten
 
 ## How It Works
 
