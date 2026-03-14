@@ -1,4 +1,4 @@
-const CACHE = 'tui-v1';
+const CACHE = 'tui-v2';
 
 // Cache CDN deps on install (they're versioned, won't change)
 const CDN_ASSETS = [
