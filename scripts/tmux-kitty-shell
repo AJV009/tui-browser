@@ -1,4 +1,4 @@
 #!/bin/sh
 export LANG=en_IN.UTF-8
 export LC_ALL=en_IN.UTF-8
-exec tmux -u new-session -A -s "kitty-$$" \; set-option destroy-unattached on
+exec tmux -u new-session -A -s "kitty-$$"

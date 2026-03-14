@@ -99,7 +99,7 @@ const Dashboard = (() => {
         <div class="session-card-header">
           <span class="session-name">${esc(s.name)}</span>
           <span class="session-status">
-            ${hasKitty ? '<span class="source-badge kitty-badge" style="font-size:10px;padding:1px 5px;margin-right:4px">Kitty</span>' : ''}
+            ${hasKitty ? '<span class="source-badge kitty-badge">Kitty</span>' : ''}
             <span class="status-dot ${statusClass}"></span>
             ${statusLabel}
           </span>
@@ -172,14 +172,14 @@ const Dashboard = (() => {
       });
       if (!res.ok) {
         const err = await res.json();
-        alert(err.error || 'Failed to create session');
+        await showModal(err.error || 'Failed to create session', 'OK');
         return;
       }
       nameInput.value = '';
       cmdInput.value = '';
       await refresh();
     } catch (err) {
-      alert('Failed to create session: ' + err.message);
+      await showModal('Failed to create session: ' + err.message, 'OK');
     }
   }
 
@@ -187,13 +187,41 @@ const Dashboard = (() => {
     App.navigate('terminal', { session: sessionName });
   }
 
+  function showModal(message, confirmLabel = 'Confirm') {
+    return new Promise((resolve) => {
+      const overlay = document.getElementById('modal-overlay');
+      const msg = document.getElementById('modal-message');
+      const confirmBtn = document.getElementById('modal-confirm');
+      const cancelBtn = document.getElementById('modal-cancel');
+      msg.textContent = message;
+      confirmBtn.textContent = confirmLabel;
+      overlay.classList.remove('hidden');
+
+      function cleanup(result) {
+        overlay.classList.add('hidden');
+        confirmBtn.removeEventListener('click', onConfirm);
+        cancelBtn.removeEventListener('click', onCancel);
+        resolve(result);
+      }
+      function onConfirm() { cleanup(true); }
+      function onCancel() { cleanup(false); }
+
+      confirmBtn.addEventListener('click', onConfirm);
+      cancelBtn.addEventListener('click', onCancel);
+    });
+  }
+
   async function kill(sessionName) {
-    if (!confirm(`Kill session "${sessionName}"? This will terminate all processes in it.`)) return;
+    const confirmed = await showModal(
+      `Kill session "${sessionName}"? This will terminate all processes in it.`,
+      'Kill'
+    );
+    if (!confirmed) return;
     try {
       await fetch(`/api/sessions/${encodeURIComponent(sessionName)}`, { method: 'DELETE' });
       await refresh();
     } catch (err) {
-      alert('Failed to kill session: ' + err.message);
+      await showModal('Failed to kill session: ' + err.message, 'OK');
     }
   }
 
