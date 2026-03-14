@@ -75,6 +75,16 @@ body {
   letter-spacing: 0.3px;
 }
 
+.connection-mode {
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.connection-mode.local { color: var(--accent); }
+.connection-mode.tunnel { color: var(--text-muted); }
+
 /* ========== Toast ========== */
 .toast {
   position: fixed;

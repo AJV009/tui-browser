@@ -145,6 +145,94 @@ const App = (() => {
     });
   }
 
+  // ---------- Local Network Fast Path ----------
+
+  let localOrigin = null;  // e.g. 'https://192.168.0.131:7484'
+  let localProbeInterval = null;
+  let certAccepted = false; // tracks if user has accepted local cert
+
+  function getWsUrl(sessionName) {
+    if (localOrigin) {
+      return `wss://${localOrigin.replace(/^https?:\/\//, '')}/ws/terminal/${encodeURIComponent(sessionName)}`;
+    }
+    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return `${proto}//${window.location.host}/ws/terminal/${encodeURIComponent(sessionName)}`;
+  }
+
+  async function probeLocalIPs() {
+    try {
+      const res = await fetch('/api/network');
+      const data = await res.json();
+      if (!data.localIPs || !data.httpsPort) return;
+
+      for (const ip of data.localIPs) {
+        const origin = `https://${ip}:${data.httpsPort}`;
+        try {
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 2000);
+          const r = await fetch(`${origin}/api/version`, { signal: controller.signal });
+          clearTimeout(timeout);
+          if (r.ok) {
+            if (localOrigin !== origin) {
+              localOrigin = origin;
+              certAccepted = true;
+              localStorage.setItem('tui_local_origin', origin);
+              updateConnectionMode('local');
+              showToast('Local network \u2014 fast path active', 'success', 3000);
+              // Reconnect terminal if connected
+              if (currentSession && currentView === 'terminal') {
+                TerminalView.disconnect();
+                TerminalView.connect(currentSession);
+              }
+            }
+            return; // found a working local IP
+          }
+        } catch { /* this IP not reachable or cert not accepted */ }
+      }
+
+      // No local IP reachable — if we were on local, switch back to tunnel
+      if (localOrigin) {
+        localOrigin = null;
+        localStorage.removeItem('tui_local_origin');
+        updateConnectionMode('tunnel');
+        showToast('Local network lost \u2014 using tunnel', 'warning', 3000);
+        if (currentSession && currentView === 'terminal') {
+          TerminalView.disconnect();
+          TerminalView.connect(currentSession);
+        }
+      }
+    } catch { /* network fetch failed */ }
+  }
+
+  function updateConnectionMode(mode) {
+    const el = document.getElementById('connection-mode');
+    if (!el) return;
+    el.textContent = mode === 'local' ? 'LAN' : 'tunnel';
+    el.className = `connection-mode ${mode}`;
+  }
+
+  function startLocalProbing() {
+    // Try cached local origin first for instant reconnect
+    const cached = localStorage.getItem('tui_local_origin');
+    if (cached) {
+      localOrigin = cached;
+      // Verify it still works
+      fetch(`${cached}/api/version`).then(r => {
+        if (!r.ok) throw new Error();
+        certAccepted = true;
+      }).catch(() => {
+        localOrigin = null;
+        localStorage.removeItem('tui_local_origin');
+      });
+    }
+
+    updateConnectionMode(localOrigin ? 'local' : 'tunnel');
+
+    // Probe every 15 seconds
+    probeLocalIPs();
+    localProbeInterval = setInterval(probeLocalIPs, 15000);
+  }
+
   // ---------- Init ----------
 
   function init() {
@@ -166,9 +254,12 @@ const App = (() => {
 
     // Online/offline detection
     initConnectivityToasts();
+
+    // Start probing for local network fast path
+    startLocalProbing();
   }
 
-  return { init, navigate, showModal, getCurrentSession: () => currentSession };
+  return { init, navigate, showModal, getWsUrl, getCurrentSession: () => currentSession, getLocalOrigin: () => localOrigin };
 })();
 
 document.addEventListener('DOMContentLoaded', App.init);

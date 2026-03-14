@@ -56,6 +56,21 @@ chmod +x ~/.local/bin/tmux-kitty-shell
 info "Installed ~/.local/bin/tmux-kitty-shell"
 
 # ──────────────────────────────────────────────
+step "Generating HTTPS certificates for local fast-path"
+# ──────────────────────────────────────────────
+
+if [ ! -f "$SCRIPT_DIR/certs/server.crt" ]; then
+  if command -v openssl &>/dev/null; then
+    bash "$SCRIPT_DIR/scripts/generate-certs.sh"
+    info "HTTPS certificates generated (accept cert on phone for fast local access)"
+  else
+    warn "openssl not found — skipping HTTPS cert generation (local fast-path disabled)"
+  fi
+else
+  info "HTTPS certificates already exist, skipping"
+fi
+
+# ──────────────────────────────────────────────
 step "Setting up tmux configuration"
 # ──────────────────────────────────────────────
 

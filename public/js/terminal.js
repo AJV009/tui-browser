@@ -390,8 +390,7 @@ const TerminalView = (() => {
     setStatus('connecting', 'Connecting\u2026');
     term.clear();
 
-    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const url = `${proto}//${window.location.host}/ws/terminal/${encodeURIComponent(sessionName)}`;
+    const url = App.getWsUrl(sessionName);
 
     try {
       ws = new WebSocket(url);
