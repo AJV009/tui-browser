@@ -30,6 +30,7 @@ Phone/Tablet/Laptop Browser              Host Machine (Kitty + tmux)
 - **Unified dashboard** — tmux sessions enriched with Kitty metadata (tab title, focus state, viewer count)
 - **Auto-discovery** — PID matching links Kitty windows to their tmux sessions automatically
 - **Session management** — create, connect, kill, rename sessions from the browser. New sessions also open a Kitty window on the host.
+- **Bulk session kill** — select multiple sessions to kill at once, or use filter presets: detached, idle, no running commands, or all
 - **Session info panel** — live-updating stats: memory, CPU, process tree, uptime, recent terminal output
 - **AI session titles** — uses Claude CLI (haiku) to auto-generate contextual session names from terminal output
 - **Quick Launch** — preset and custom commands saved to `shortcuts.json`, launch sessions in one tap

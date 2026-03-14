@@ -276,6 +276,67 @@ app.delete('/api/sessions/:name', apiHandler(async (req, res) => {
   res.json({ ok: true });
 }));
 
+const SHELL_NAMES = new Set(['bash', 'zsh', 'sh', 'fish', 'dash', 'ksh', 'csh', 'tcsh', 'nu', 'pwsh', 'login']);
+
+app.post('/api/sessions/bulk-kill', apiHandler(async (req, res) => {
+  const { names, filter, inactiveMinutes } = req.body || {};
+  if (!Array.isArray(names) || names.length === 0) {
+    return res.status(400).json({ error: 'names array is required' });
+  }
+  if (names.length > 100) {
+    return res.status(400).json({ error: 'Cannot kill more than 100 sessions at once' });
+  }
+
+  let targetNames = names;
+
+  // Server-side verification: re-check filter conditions before killing
+  if (filter) {
+    const currentSessions = await discovery.listSessions();
+    annotateSessions(currentSessions);
+    const requestedSet = new Set(names);
+
+    targetNames = currentSessions
+      .filter(s => requestedSet.has(s.name))
+      .filter(s => {
+        switch (filter) {
+          case 'detached':
+            return s.attached === 0 && (s.webClients || 0) === 0;
+          case 'no-commands':
+            return s.panes.every(p => SHELL_NAMES.has(p.command));
+          case 'inactive': {
+            const cutoffMs = Date.now() - (inactiveMinutes || 10) * 60 * 1000;
+            return s.lastActivity < cutoffMs;
+          }
+          case 'all':
+            return true;
+          default:
+            return false;
+        }
+      })
+      .map(s => s.name);
+  }
+
+  const results = await Promise.allSettled(
+    targetNames.map(name => sessions.killSession(name))
+  );
+
+  const killed = [];
+  const failed = [];
+  for (let i = 0; i < targetNames.length; i++) {
+    if (results[i].status === 'fulfilled') {
+      killed.push(targetNames[i]);
+    } else {
+      failed.push({ name: targetNames[i], error: results[i].reason?.message || 'unknown' });
+    }
+  }
+
+  // Clean up display titles for killed sessions
+  for (const name of killed) displayTitles.delete(name);
+  if (killed.length > 0) saveTitles();
+
+  res.json({ killed, failed });
+}));
+
 // Deprecated: Kitty discovery is now part of /api/discover unified response.
 // Kept for debugging purposes.
 app.get('/api/kitty/windows', apiHandler(async (_req, res) => {

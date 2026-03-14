@@ -11,6 +11,9 @@ const Dashboard = (() => {
   let sortMode = 'recent'; // 'recent' | 'oldest' | 'active' | 'idle'
   let lastSessions = null;
   let lastUnmatchedKitty = null;
+  const selectedSessions = new Set();
+
+  const SHELL_NAMES = new Set(['bash', 'zsh', 'sh', 'fish', 'dash', 'ksh', 'csh', 'tcsh', 'nu', 'pwsh', 'login']);
 
   // Inline SVG icons (22x22, fill the 38px btn-icon buttons properly)
   const ICON = {
@@ -38,6 +41,8 @@ const Dashboard = (() => {
         openInfo(btn.dataset.session);
       } else if (action === 'kill') {
         kill(btn.dataset.session);
+      } else if (action === 'toggle-select') {
+        toggleSelect(btn.dataset.session);
       }
     });
 
@@ -61,6 +66,7 @@ const Dashboard = (() => {
     });
 
     document.getElementById('info-close').addEventListener('click', closeInfo);
+    document.getElementById('bulk-kill-btn').addEventListener('click', handleBulkKill);
 
     document.getElementById('sort-select').addEventListener('change', (e) => {
       sortMode = e.target.value;
@@ -306,6 +312,13 @@ const Dashboard = (() => {
     }
 
     list.innerHTML = html;
+
+    // Prune stale selections
+    const currentNames = new Set(sessions.map(s => s.name));
+    for (const name of selectedSessions) {
+      if (!currentNames.has(name)) selectedSessions.delete(name);
+    }
+    updateBulkKillButton();
   }
 
   function renderSessionCard(s) {
@@ -344,8 +357,11 @@ const Dashboard = (() => {
 
     const label = s.displayTitle || s.name;
 
+    const isSelected = selectedSessions.has(s.name);
+
     return `
-      <div class="session-card${hasKitty ? ' kitty-card' : ''}" data-session="${esc(s.name)}">
+      <div class="session-card${hasKitty ? ' kitty-card' : ''}${isSelected ? ' session-selected' : ''}" data-session="${esc(s.name)}">
+        <div class="select-circle${isSelected ? ' selected' : ''}" data-action="toggle-select" data-session="${esc(s.name)}"></div>
         <div class="session-card-header">
           <span class="session-name">${esc(label)}</span>
           <span class="session-status">
@@ -464,6 +480,202 @@ const Dashboard = (() => {
       await refresh();
     } catch (err) {
       await App.showModal('Failed to kill session: ' + err.message, 'OK');
+    }
+  }
+
+  // ---------- Selection & Bulk Kill ----------
+
+  function toggleSelect(name) {
+    if (selectedSessions.has(name)) {
+      selectedSessions.delete(name);
+    } else {
+      selectedSessions.add(name);
+    }
+    const card = document.querySelector(`.session-card[data-session="${CSS.escape(name)}"]`);
+    if (card) {
+      const circle = card.querySelector('.select-circle');
+      if (circle) circle.classList.toggle('selected', selectedSessions.has(name));
+      card.classList.toggle('session-selected', selectedSessions.has(name));
+    }
+    updateBulkKillButton();
+  }
+
+  function updateBulkKillButton() {
+    const btn = document.getElementById('bulk-kill-btn');
+    if (!btn) return;
+    const count = selectedSessions.size;
+    const badge = btn.querySelector('.bulk-kill-badge');
+    if (count > 0) {
+      btn.classList.add('has-selection');
+      if (badge) badge.textContent = count;
+    } else {
+      btn.classList.remove('has-selection');
+      if (badge) badge.textContent = '';
+    }
+  }
+
+  async function handleBulkKill() {
+    if (selectedSessions.size > 0) {
+      const names = [...selectedSessions];
+      const confirmed = await App.showModal(
+        `Kill ${names.length} selected session${names.length > 1 ? 's' : ''}? This will terminate all processes in them.`,
+        'Kill'
+      );
+      if (!confirmed) return;
+      await executeBulkKill(names);
+    } else {
+      await showBulkKillModal();
+    }
+  }
+
+  function isShellOnly(session) {
+    if (!session.panes || session.panes.length === 0) return true;
+    return session.panes.every(p => SHELL_NAMES.has(p.command));
+  }
+
+  function countInactive(sessions, minutes) {
+    const cutoff = Date.now() - minutes * 60 * 1000;
+    return sessions.filter(s => s.lastActivity < cutoff).length;
+  }
+
+  function countForFilter(sessions, filter, minutes) {
+    switch (filter) {
+      case 'detached': return sessions.filter(s => s.attached === 0 && (s.webClients || 0) === 0).length;
+      case 'no-commands': return sessions.filter(s => isShellOnly(s)).length;
+      case 'inactive': return countInactive(sessions, minutes);
+      case 'all': return sessions.length;
+      default: return 0;
+    }
+  }
+
+  function getNamesForFilter(sessions, filter, minutes) {
+    switch (filter) {
+      case 'detached': return sessions.filter(s => s.attached === 0 && (s.webClients || 0) === 0).map(s => s.name);
+      case 'no-commands': return sessions.filter(s => isShellOnly(s)).map(s => s.name);
+      case 'inactive': {
+        const cutoff = Date.now() - minutes * 60 * 1000;
+        return sessions.filter(s => s.lastActivity < cutoff).map(s => s.name);
+      }
+      case 'all': return sessions.map(s => s.name);
+      default: return [];
+    }
+  }
+
+  async function showBulkKillModal() {
+    const sessions = lastSessions || [];
+    if (sessions.length === 0) {
+      await App.showModal('No sessions to kill.', 'OK');
+      return;
+    }
+
+    const overlay = document.getElementById('modal-overlay');
+    const modal = overlay.querySelector('.modal');
+    const msg = document.getElementById('modal-message');
+    const confirmBtn = document.getElementById('modal-confirm');
+    const cancelBtn = document.getElementById('modal-cancel');
+
+    const detachedCount = countForFilter(sessions, 'detached');
+    const noCommandCount = countForFilter(sessions, 'no-commands');
+    const totalCount = sessions.length;
+
+    msg.innerHTML = `
+      <div style="margin-bottom:12px;font-family:var(--mono);font-size:13px;font-weight:600;color:var(--danger)">Bulk Kill Sessions</div>
+      <div class="bulk-kill-radios">
+        <label class="bulk-radio">
+          <input type="radio" name="bulk-filter" value="detached" checked>
+          <span>Kill all detached sessions <span class="bulk-count">(${detachedCount})</span></span>
+        </label>
+        <label class="bulk-radio">
+          <input type="radio" name="bulk-filter" value="no-commands">
+          <span>Kill sessions with no running commands <span class="bulk-count">(${noCommandCount})</span></span>
+        </label>
+        <label class="bulk-radio">
+          <input type="radio" name="bulk-filter" value="inactive">
+          <span>Kill sessions inactive since past
+            <input id="inactive-minutes" type="number" value="10" min="1" max="9999"
+                   style="width:50px;padding:2px 4px;background:var(--surface);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--mono);font-size:12px;text-align:center;"
+                   onclick="event.stopPropagation()"> min
+            <span class="bulk-count" id="inactive-count">(${countInactive(sessions, 10)})</span>
+          </span>
+        </label>
+        <label class="bulk-radio">
+          <input type="radio" name="bulk-filter" value="all">
+          <span>Kill all sessions <span class="bulk-count">(${totalCount})</span></span>
+        </label>
+      </div>
+      <div class="bulk-kill-note">You have selected to kill <strong id="bulk-kill-target-count">${detachedCount}</strong> session${detachedCount !== 1 ? 's' : ''}</div>`;
+
+    modal.style.maxWidth = '440px';
+    overlay.classList.remove('hidden');
+
+    const radios = msg.querySelectorAll('input[name="bulk-filter"]');
+    const minutesInput = msg.querySelector('#inactive-minutes');
+
+    function updateNote() {
+      const filter = msg.querySelector('input[name="bulk-filter"]:checked').value;
+      const minutes = parseInt(minutesInput.value, 10) || 10;
+      const count = countForFilter(sessions, filter, minutes);
+      const inactiveCountEl = msg.querySelector('#inactive-count');
+      if (inactiveCountEl) inactiveCountEl.textContent = `(${countInactive(sessions, minutes)})`;
+      const targetEl = msg.querySelector('#bulk-kill-target-count');
+      if (targetEl) targetEl.textContent = count;
+    }
+
+    radios.forEach(r => r.addEventListener('change', updateNote));
+    minutesInput.addEventListener('input', updateNote);
+
+    return new Promise(resolve => {
+      function cleanup() {
+        overlay.classList.add('hidden');
+        modal.style.maxWidth = '';
+        confirmBtn.removeEventListener('click', onConfirm);
+        cancelBtn.removeEventListener('click', onCancel);
+        resolve();
+      }
+
+      async function onConfirm() {
+        const filter = msg.querySelector('input[name="bulk-filter"]:checked').value;
+        const minutes = parseInt(minutesInput.value, 10) || 10;
+        const names = getNamesForFilter(sessions, filter, minutes);
+        cleanup();
+        if (names.length === 0) {
+          await App.showModal('No sessions match the selected filter.', 'OK');
+          return;
+        }
+        await executeBulkKill(names, filter, filter === 'inactive' ? minutes : undefined);
+      }
+
+      function onCancel() { cleanup(); }
+
+      confirmBtn.addEventListener('click', onConfirm);
+      cancelBtn.addEventListener('click', onCancel);
+    });
+  }
+
+  async function executeBulkKill(names, filter, inactiveMinutes) {
+    try {
+      const body = { names };
+      if (filter) body.filter = filter;
+      if (inactiveMinutes !== undefined) body.inactiveMinutes = inactiveMinutes;
+
+      const res = await fetch('/api/sessions/bulk-kill', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        await App.showModal(err.error || 'Bulk kill failed', 'OK');
+        return;
+      }
+      const result = await res.json();
+      for (const name of result.killed) selectedSessions.delete(name);
+      if (result.failed.length > 0) {
+        await App.showModal(`Killed ${result.killed.length}. Failed: ${result.failed.map(f => f.name).join(', ')}`, 'OK');
+      }
+      await refresh();
+    } catch (err) {
+      await App.showModal('Bulk kill failed: ' + err.message, 'OK');
     }
   }
 
