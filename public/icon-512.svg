@@ -30,12 +30,12 @@
   <path d="M434,170 L256,272 L256,444 L434,342 Z" fill="url(#cubeRight)" stroke="#00e5a0" stroke-width="2.5" stroke-linejoin="round" stroke-opacity="0.3"/>
 
   <!-- ═══ TOP FACE: WiFi signal flush on surface ═══ -->
-  <g transform="matrix(0.92, 0.53, -0.92, 0.53, 256, 178)">
-    <!-- Arcs — thick and bold, unmistakable wifi -->
-    <path d="M-48,-40 A68,68 0 0,1 48,-40" fill="none" stroke="#00e5a0" stroke-width="8" stroke-linecap="round" opacity="0.3"/>
-    <path d="M-34,-28 A48,48 0 0,1 34,-28" fill="none" stroke="#00e5a0" stroke-width="8" stroke-linecap="round" opacity="0.55"/>
-    <path d="M-20,-16 A28,28 0 0,1 20,-16" fill="none" stroke="#00e5a0" stroke-width="8" stroke-linecap="round" opacity="0.85"/>
-    <circle cx="0" cy="0" r="8" fill="#00e5a0"/>
+  <g transform="matrix(0.92, 0.53, -0.92, 0.53, 256, 170)">
+    <!-- Arcs — big, thick, fills the top face -->
+    <path d="M-72,-60 A102,102 0 0,1 72,-60" fill="none" stroke="#00e5a0" stroke-width="11" stroke-linecap="round" opacity="0.3"/>
+    <path d="M-50,-42 A72,72 0 0,1 50,-42" fill="none" stroke="#00e5a0" stroke-width="11" stroke-linecap="round" opacity="0.55"/>
+    <path d="M-28,-24 A40,40 0 0,1 28,-24" fill="none" stroke="#00e5a0" stroke-width="11" stroke-linecap="round" opacity="0.85"/>
+    <circle cx="0" cy="0" r="11" fill="#00e5a0"/>
   </g>
 
   <!-- ═══ LEFT FACE: </> centered on face ═══ -->
