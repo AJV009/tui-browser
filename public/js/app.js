@@ -193,16 +193,13 @@ const App = (() => {
         } catch { /* this IP not reachable or cert not accepted */ }
       }
 
-      // No local IP reachable — prompt cert acceptance if never done
+      // No local IP reachable — prompt cert setup if never done
       if (!certAccepted && data.localIPs.length > 0) {
-        const ip = data.localIPs[0];
-        const certUrl = `https://${ip}:${data.httpsPort}`;
-        // Only prompt once per page load
         if (!probeLocalIPs._prompted) {
           probeLocalIPs._prompted = true;
           const el = document.getElementById('connection-mode');
           if (el) {
-            el.innerHTML = `<a href="${certUrl}/api/version" target="_blank" title="Accept local cert for fast access" style="color:var(--orange);font-family:var(--mono);font-size:9px;text-decoration:underline">accept local cert</a>`;
+            el.innerHTML = `<a href="/setup-local.html" title="Setup local fast-path" style="color:var(--orange);font-family:var(--mono);font-size:9px;text-decoration:underline">setup local</a>`;
           }
         }
       }
