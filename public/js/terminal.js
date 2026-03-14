@@ -155,10 +155,7 @@ const TerminalView = (() => {
         const res = await fetch(`/api/sessions/${encodeURIComponent(currentSession)}/generate-title`, { method: 'POST' });
         const data = await res.json();
         if (data.title) {
-          const nameLabel = document.getElementById('terminal-session-name');
-          nameLabel.textContent = data.title;
-          currentSession = data.title;
-          window.location.hash = `#terminal/${encodeURIComponent(data.title)}`;
+          document.getElementById('terminal-session-name').textContent = data.title;
         }
       } catch { /* ignore */ }
       aiTitleBtn.classList.remove('loading');
@@ -182,8 +179,8 @@ const TerminalView = (() => {
     async function commitRename() {
       nameInput.classList.add('hidden');
       nameLabel.classList.remove('hidden');
-      let newName = nameInput.value.trim().replace(/\s+/g, '-');
-      if (!newName || newName === currentSession) return;
+      let newName = nameInput.value.trim();
+      if (!newName || newName === nameLabel.textContent) return;
       try {
         const res = await fetch(`/api/sessions/${encodeURIComponent(currentSession)}/rename`, {
           method: 'POST',
@@ -191,9 +188,8 @@ const TerminalView = (() => {
           body: JSON.stringify({ newName }),
         });
         if (res.ok) {
-          currentSession = newName;
           nameLabel.textContent = newName;
-          window.location.hash = `#terminal/${encodeURIComponent(newName)}`;
+          // currentSession and URL hash stay unchanged — tmux name is the stable ID
         }
       } catch { /* ignore */ }
     }

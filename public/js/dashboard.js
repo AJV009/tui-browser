@@ -339,10 +339,12 @@ const Dashboard = (() => {
         </div>`;
     }
 
+    const label = s.displayTitle || s.name;
+
     return `
       <div class="session-card${hasKitty ? ' kitty-card' : ''}" data-session="${esc(s.name)}">
         <div class="session-card-header">
-          <span class="session-name">${esc(s.name)}</span>
+          <span class="session-name">${esc(label)}</span>
           <span class="session-status">
             ${hasKitty ? '<span class="source-badge kitty-badge">Kitty</span>' : ''}
             <span class="status-dot ${statusClass}"></span>
