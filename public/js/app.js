@@ -165,7 +165,10 @@ const App = (() => {
       const data = await res.json();
       if (!data.localIPs || !data.httpsPort) return;
 
-      for (const ip of data.localIPs) {
+      // Also try localhost/127.0.0.1 for same-machine access
+      const ipsToTry = ['127.0.0.1', ...data.localIPs];
+
+      for (const ip of ipsToTry) {
         const origin = `https://${ip}:${data.httpsPort}`;
         try {
           const controller = new AbortController();
@@ -188,6 +191,20 @@ const App = (() => {
             return; // found a working local IP
           }
         } catch { /* this IP not reachable or cert not accepted */ }
+      }
+
+      // No local IP reachable — prompt cert acceptance if never done
+      if (!certAccepted && data.localIPs.length > 0) {
+        const ip = data.localIPs[0];
+        const certUrl = `https://${ip}:${data.httpsPort}`;
+        // Only prompt once per page load
+        if (!probeLocalIPs._prompted) {
+          probeLocalIPs._prompted = true;
+          const el = document.getElementById('connection-mode');
+          if (el) {
+            el.innerHTML = `<a href="${certUrl}/api/version" target="_blank" title="Accept local cert for fast access" style="color:var(--orange);font-family:var(--mono);font-size:9px;text-decoration:underline">accept local cert</a>`;
+          }
+        }
       }
 
       // No local IP reachable — if we were on local, switch back to tunnel
