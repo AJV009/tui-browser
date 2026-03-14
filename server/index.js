@@ -55,12 +55,18 @@ app.get('/api/sessions/:name', async (req, res) => {
 });
 
 app.post('/api/sessions', async (req, res) => {
-  const { name, command } = req.body || {};
+  const { name, command, cwd } = req.body || {};
   if (!name || !name.trim()) {
     return res.status(400).json({ error: 'Session name is required' });
   }
+  // Validate cwd if provided: must be absolute path, no null bytes
+  if (cwd != null) {
+    if (typeof cwd !== 'string' || !cwd.startsWith('/') || cwd.includes('\0')) {
+      return res.status(400).json({ error: 'Invalid cwd: must be an absolute path' });
+    }
+  }
   try {
-    const result = await sessions.createSession(name.trim(), command || 'bash');
+    const result = await sessions.createSession(name.trim(), command || 'bash', 80, 24, cwd);
     res.status(201).json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -76,7 +82,8 @@ app.delete('/api/sessions/:name', async (req, res) => {
   }
 });
 
-// Kitty window discovery
+// Deprecated: Kitty discovery is now part of /api/discover unified response.
+// Kept for debugging purposes.
 app.get('/api/kitty/windows', async (_req, res) => {
   try {
     const result = await kittyDiscovery.discoverKittyWindows();
@@ -90,8 +97,8 @@ app.get('/api/kitty/windows', async (_req, res) => {
 app.get('/api/discover', async (_req, res) => {
   try {
     const result = await discovery.discoverAll();
-    // annotate tmux sessions with web client counts
-    for (const s of result.tmux) {
+    // annotate unified sessions with web client counts
+    for (const s of result.sessions) {
       s.webClients = sessions.getClientCount(s.name);
     }
     res.json(result);
@@ -204,4 +211,23 @@ wss.on('connection', (ws, sessionName) => {
     console.log(`TUI Browser listening on http://localhost:${PORT}`);
     console.log('Open this URL in your browser (or on your phone on the same network).');
   });
+
+  function gracefulShutdown(signal) {
+    console.log(`${signal} received — shutting down gracefully...`);
+    sessions.shutdown();
+    wss.close();
+    server.close(() => {
+      console.log('Server closed.');
+      process.exit(0);
+    });
+    // Force exit after 5 seconds if graceful close hangs
+    const forceTimer = setTimeout(() => {
+      console.log('Forcing exit after timeout.');
+      process.exit(1);
+    }, 5000);
+    forceTimer.unref();
+  }
+
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 })();

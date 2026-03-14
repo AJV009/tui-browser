@@ -122,7 +122,7 @@ body {
 .btn-danger:hover { background: #6a2535; color: #fff; }
 
 /* ========== Session Cards ========== */
-.session-list {
+#session-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 12px;
@@ -249,6 +249,15 @@ body {
   color: #666;
 }
 
+.unmatched-kitty-section .source-label {
+  color: #555;
+  font-style: italic;
+}
+
+.unmatched-card {
+  opacity: 0.5;
+}
+
 /* ========== Kitty Cards ========== */
 .kitty-card {
   border-left: 3px solid #7c4dff;
@@ -326,7 +335,7 @@ body {
 
 /* ========== Responsive ========== */
 @media (max-width: 768px) {
-  .session-list {
+  #session-list {
     grid-template-columns: 1fr;
   }
 
