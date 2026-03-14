@@ -98,11 +98,19 @@ set -as terminal-features 'xterm*:extkeys'
 # UTF-8 support
 set-window-option -q -g utf8 on
 
+# Size to the most recently active client, not the smallest
+set -g window-size latest
+set -g aggressive-resize on
+
 # Mouse support
 set -g mouse on
 
 # Hide status bar (tui-browser provides its own UI)
 set -g status off
+
+# Forward pane titles to kitty
+set -g set-titles on
+set -g set-titles-string '#T'
 
 # Keep windows alive after process exit
 set -g remain-on-exit on

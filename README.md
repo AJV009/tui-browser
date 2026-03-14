@@ -290,6 +290,10 @@ The terminal view includes touch-optimized controls:
 - **Keyboard awareness** — UI shifts above the soft keyboard automatically
 - **Double-tap** a session card on the dashboard to connect directly
 
+## Kitty + tmux Gotchas
+
+Running Kitty windows inside tmux breaks a few things (tab CWD, titles, Shift+Enter). See [docs/kitty-tmux-integration.md](docs/kitty-tmux-integration.md) for fixes.
+
 ## tmux Tips
 
 - **Scroll up**: mouse wheel scrolls the buffer when `mouse on` is set in `~/.tmux.conf` (the install script enables this).
