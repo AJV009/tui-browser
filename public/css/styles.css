@@ -110,6 +110,106 @@ body {
   flex: 1;
 }
 
+/* ========== Toolbar Right ========== */
+.toolbar-right {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* ========== Shortcuts ========== */
+.shortcuts-dropdown {
+  display: inline-flex;
+}
+
+.shortcuts-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+
+.shortcuts-menu {
+  position: fixed;
+  z-index: 60;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-hover);
+  border-radius: 10px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+  min-width: 240px;
+}
+
+.shortcuts-menu .shortcut-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: background 0.1s;
+  border-bottom: 1px solid var(--border);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.shortcuts-menu .shortcut-item:last-child {
+  border-bottom: none;
+}
+
+.shortcuts-menu .shortcut-item:hover,
+.shortcuts-menu .shortcut-item:active {
+  background: var(--surface-hover);
+}
+
+.shortcut-label {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.shortcut-cmd {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Mobile: bottom sheet */
+@media (max-width: 768px) {
+  .shortcuts-menu {
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    top: auto !important;
+    width: 100%;
+    min-width: unset;
+    border-radius: 16px 16px 0 0;
+    border-bottom: none;
+    max-height: 60vh;
+    overflow-y: auto;
+  }
+
+  .shortcuts-menu .shortcut-item {
+    padding: 16px 20px;
+    gap: 4px;
+    min-height: 56px;
+    justify-content: center;
+  }
+
+  .shortcuts-menu .shortcut-label {
+    font-size: 15px;
+  }
+
+  .shortcuts-menu .shortcut-cmd {
+    font-size: 12px;
+  }
+}
+
 /* ========== Create Session Form ========== */
 .create-form {
   display: flex;
@@ -492,6 +592,49 @@ body {
 
 #terminal-container .xterm { height: 100%; }
 
+/* ========== Terminal Quick-Keys Bar ========== */
+.terminal-quickbar {
+  display: none;
+  gap: 4px;
+  padding: 5px 4px;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.qk {
+  flex: 1;
+  height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-raised);
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+.qk:active {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.qk-sep {
+  width: 1px;
+  align-self: stretch;
+  margin: 8px 0;
+  background: var(--border);
+  flex-shrink: 0;
+}
+
 /* ========== Responsive ========== */
 @media (max-width: 768px) {
   #session-list {
@@ -499,6 +642,11 @@ body {
   }
 
   .dashboard-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .toolbar-right {
     flex-direction: column;
     align-items: stretch;
   }
@@ -515,6 +663,16 @@ body {
 
   .terminal-toolbar {
     padding: 6px 10px;
+  }
+
+  .terminal-quickbar {
+    display: flex;
+    padding-bottom: max(5px, env(safe-area-inset-bottom));
+  }
+
+  .qk {
+    height: 46px;
+    font-size: 15px;
   }
 
   .session-card {

@@ -113,10 +113,12 @@ async function createSession(name, command = 'bash', cols = 80, rows = 24, cwd, 
   if (cwd) {
     args.push('-c', cwd);
   }
-  if (command && command !== 'bash') {
-    args.push(command);
-  }
   await exec('tmux', args);
+
+  // Send the command as keystrokes so the session keeps a live shell
+  if (command && command !== 'bash') {
+    await exec('tmux', ['send-keys', '-t', name, command, 'Enter']);
+  }
 
   // Best-effort: open a Kitty window attached to this session
   if (openKitty) {

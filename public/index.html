@@ -30,11 +30,17 @@
     <div class="dashboard-content">
       <div class="dashboard-toolbar">
         <h2>Sessions</h2>
-        <form id="create-session-form" class="create-form">
-          <input id="new-session-name" type="text" placeholder="Session name" autocomplete="off">
-          <input id="new-session-cmd" type="text" placeholder="Command (default: bash)" autocomplete="off">
-          <button type="submit" class="btn btn-primary">New Session</button>
-        </form>
+        <div class="toolbar-right">
+          <div id="shortcuts-dropdown" class="shortcuts-dropdown">
+            <button id="shortcuts-btn" class="btn btn-secondary" type="button">Quick Launch &#9662;</button>
+            <div id="shortcuts-menu" class="shortcuts-menu hidden"></div>
+          </div>
+          <form id="create-session-form" class="create-form">
+            <input id="new-session-name" type="text" placeholder="Session name" autocomplete="off">
+            <input id="new-session-cmd" type="text" placeholder="Command (default: bash)" autocomplete="off">
+            <button type="submit" class="btn btn-primary">New Session</button>
+          </form>
+        </div>
       </div>
       <div id="session-list"></div>
     </div>
@@ -56,6 +62,18 @@
       </div>
     </div>
     <div id="terminal-container"></div>
+    <div id="terminal-quickbar" class="terminal-quickbar">
+      <button class="qk" data-qk="esc">Esc</button>
+      <button class="qk" data-qk="tab">Tab</button>
+      <button class="qk" data-qk="ctrl-c">^C</button>
+      <button class="qk" data-qk="ctrl-d">^D</button>
+      <button class="qk" data-qk="ctrl-z">^Z</button>
+      <span class="qk-sep"></span>
+      <button class="qk" data-qk="up">&uarr;</button>
+      <button class="qk" data-qk="down">&darr;</button>
+      <button class="qk" data-qk="left">&larr;</button>
+      <button class="qk" data-qk="right">&rarr;</button>
+    </div>
   </div>
 
   <!-- Modal -->

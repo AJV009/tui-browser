@@ -1,0 +1,4 @@
+[
+  { "label": "Projects Dir", "command": "cd ~/project/; clear" },
+  { "label": "Temp Dir with Claude", "command": "cd ~/project/_TEMP_; cx" }
+]
