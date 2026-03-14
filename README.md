@@ -211,6 +211,12 @@ tui-browser/
 └── package.json
 ```
 
+## tmux Tips
+
+- **Scroll up**: mouse wheel scrolls the buffer when `mouse on` is set in `~/.tmux.conf` (the install script enables this).
+- **Select text**: hold `Shift` while clicking/dragging to use your terminal's native selection — this bypasses tmux's copy mode, which otherwise jumps to the bottom after selecting.
+- **Copy-mode (keyboard)**: `Ctrl+b` then `[` enters copy mode. Use arrow keys / `Page Up` / `Page Down` to scroll. Press `q` to exit.
+
 ## How It Works
 
 1. **Every Kitty window runs inside tmux** via a wrapper script (`tmux-kitty-shell`)
