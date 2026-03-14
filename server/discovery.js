@@ -2,16 +2,7 @@
  * tmux session discovery — queries tmux for active sessions, windows, and panes.
  */
 
-const { execFile } = require('child_process');
-
-function exec(cmd, args) {
-  return new Promise((resolve, reject) => {
-    execFile(cmd, args, { timeout: 5000 }, (err, stdout, stderr) => {
-      if (err) return reject(err);
-      resolve(stdout.trimEnd());
-    });
-  });
-}
+const { exec } = require('./exec-util');
 
 async function isTmuxAvailable() {
   try {
