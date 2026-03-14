@@ -691,41 +691,20 @@ body {
 
 .terminal-kill-btn:hover { background: #ff405744; color: #fff; }
 
-.zoom-controls {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-
-.zoom-btn {
-  width: 32px;
-  height: 32px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--surface);
-  color: var(--text-dim);
-  font-size: 16px;
-  font-weight: 700;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  touch-action: manipulation;
-  -webkit-tap-highlight-color: transparent;
-  user-select: none;
-  position: relative;
-  z-index: 10;
-  transition: all 0.15s;
-}
-
-.zoom-btn:hover { background: var(--surface-hover); color: var(--text); border-color: var(--border-hover); }
-
-#zoom-level {
+.zoom-level-float {
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: 9px;
   color: var(--text-muted);
-  min-width: 22px;
   text-align: center;
+  line-height: 1;
+}
+
+.scroll-sep {
+  width: 20px;
+  height: 1px;
+  background: var(--border-hover);
+  align-self: center;
+  margin: 2px 0;
 }
 
 .reconnect-btn {
