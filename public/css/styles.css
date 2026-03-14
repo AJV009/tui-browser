@@ -75,15 +75,19 @@ body {
   letter-spacing: 0.3px;
 }
 
-.connection-mode {
-  font-family: var(--mono);
-  font-size: 9px;
-  font-weight: 600;
-  letter-spacing: 0.5px;
+.header-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
 }
 
-.connection-mode.local { color: var(--accent); }
-.connection-mode.tunnel { color: var(--text-muted); }
+.connection-mode {
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+}
+
+.connection-mode svg { display: block; }
 
 /* ========== Toast ========== */
 .toast {

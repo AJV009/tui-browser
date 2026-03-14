@@ -207,8 +207,13 @@ const App = (() => {
   function updateConnectionMode(mode) {
     const el = document.getElementById('connection-mode');
     if (!el) return;
-    el.textContent = mode === 'local' ? 'LAN' : 'tunnel';
-    el.className = `connection-mode ${mode}`;
+    if (mode === 'local') {
+      el.innerHTML = '<svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="#00e5a0" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 7.5L8 2l6 5.5"/><path d="M3.5 6.5V14H7v-4h2v4h3.5V6.5"/></svg>';
+      el.title = 'Local network (LAN)';
+    } else {
+      el.innerHTML = '<svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="#fb923c" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6.5"/><path d="M1.5 8h13M8 1.5c-2 2-3 4-3 6.5s1 4.5 3 6.5M8 1.5c2 2 3 4 3 6.5s-1 4.5-3 6.5"/></svg>';
+      el.title = 'Internet (tunnel)';
+    }
   }
 
   function startLocalProbing() {
