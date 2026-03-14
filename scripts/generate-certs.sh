@@ -1,30 +1,52 @@
 #!/bin/bash
-# Generate self-signed cert for local HTTPS access
-# Includes all current local IPv4 addresses as SANs
+# Generate TLS certificates for local HTTPS fast-path
+# Uses mkcert (preferred) or falls back to openssl self-signed
 
 set -e
 
 CERT_DIR="$(cd "$(dirname "$0")/.." && pwd)/certs"
+PUBLIC_DIR="$(cd "$(dirname "$0")/.." && pwd)/public"
 mkdir -p "$CERT_DIR"
 
 # Collect local IPs
-LOCAL_IPS=$(ip -4 addr show | grep 'inet ' | awk '{print $2}' | cut -d/ -f1 | grep -v '^127\.' || hostname -I 2>/dev/null | tr ' ' '\n' | grep -v '^$')
+LOCAL_IPS=$(ip -4 addr show 2>/dev/null | grep 'inet ' | awk '{print $2}' | cut -d/ -f1 | grep -v '^127\.' || hostname -I 2>/dev/null | tr ' ' '\n' | grep -v '^$')
 
-# Build SAN list
-SAN="DNS:localhost,IP:127.0.0.1"
-for ip in $LOCAL_IPS; do
-  SAN="$SAN,IP:$ip"
-done
+if command -v mkcert &>/dev/null; then
+  echo "Using mkcert for trusted certificates..."
 
-openssl req -x509 -newkey rsa:2048 \
-  -keyout "$CERT_DIR/server.key" \
-  -out "$CERT_DIR/server.crt" \
-  -days 365 -nodes \
-  -subj "/CN=TUI Browser/O=TUI Browser" \
-  -addext "subjectAltName=$SAN" 2>/dev/null
+  # Install CA if not yet done
+  if [ ! -f "$(mkcert -CAROOT)/rootCA.pem" ]; then
+    mkcert -install 2>/dev/null || echo "Note: run 'sudo mkcert -install' to trust CA system-wide"
+  fi
 
-echo "Certificate generated in $CERT_DIR"
-echo "SANs: $SAN"
-echo ""
-echo "To trust on your phone (one-time):"
-echo "  Visit https://<local-ip>:7484 and accept the certificate warning"
+  # Generate cert for all local IPs
+  mkcert -cert-file "$CERT_DIR/server.crt" -key-file "$CERT_DIR/server.key" \
+    localhost 127.0.0.1 $LOCAL_IPS
+
+  # Copy CA cert to public dir for easy phone download
+  cp "$(mkcert -CAROOT)/rootCA.pem" "$PUBLIC_DIR/tui-browser-ca.crt"
+
+  echo ""
+  echo "To trust on Android/iOS (one-time):"
+  echo "  1. Open https://tui.yourdomain.com/tui-browser-ca.crt on your phone"
+  echo "  2. Android: Settings > Security > Install certificate > CA certificate"
+  echo "  3. iOS: Settings > Profile Downloaded > Install > Trust"
+  echo ""
+else
+  echo "Using openssl (self-signed, browsers will show warnings)..."
+
+  SAN="DNS:localhost,IP:127.0.0.1"
+  for ip in $LOCAL_IPS; do
+    SAN="$SAN,IP:$ip"
+  done
+
+  openssl req -x509 -newkey rsa:2048 \
+    -keyout "$CERT_DIR/server.key" \
+    -out "$CERT_DIR/server.crt" \
+    -days 365 -nodes \
+    -subj "/CN=TUI Browser/O=TUI Browser" \
+    -addext "subjectAltName=$SAN" 2>/dev/null
+fi
+
+echo "Certificates in $CERT_DIR"
+echo "Local IPs: $LOCAL_IPS"

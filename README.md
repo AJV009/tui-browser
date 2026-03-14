@@ -105,13 +105,23 @@ When your phone/tablet is on the same network as the host PC (WiFi, hotspot), th
    ./scripts/generate-certs.sh
    ```
 
-2. On your phone/tablet, open the app via the tunnel URL (e.g., `https://tui.yourdomain.com`)
+2. Install the CA certificate on your phone (one-time, enables all future local connections):
 
-3. You'll see a small "accept local cert" link next to the last-updated timestamp — tap it
+   **Android:**
+   - Open `https://tui.yourdomain.com/tui-browser-ca.crt` on your phone — it downloads the CA cert
+   - Go to **Settings > Security > Encryption & credentials > Install a certificate > CA certificate**
+   - Select the downloaded `tui-browser-ca.crt` file
+   - Confirm the install
 
-4. Accept the certificate warning in the browser (this is a one-time step per device)
+   **iOS:**
+   - Open `https://tui.yourdomain.com/tui-browser-ca.crt` in Safari
+   - Go to **Settings > General > Profile > TUI Browser** and tap **Install**
+   - Go to **Settings > General > About > Certificate Trust Settings** and enable the TUI Browser CA
 
-5. The next probe cycle (within 15 seconds) will detect the local path and switch automatically
+   **Desktop browser:**
+   - Just visit `https://localhost:7484` and accept the warning (or run `sudo mkcert -install` to trust system-wide)
+
+3. The app will automatically detect the local connection within 15 seconds and switch — green house icon appears in the header
 
 **When does it activate?**
 - Phone connected to same WiFi as the host PC
