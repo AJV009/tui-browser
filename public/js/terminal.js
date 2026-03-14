@@ -451,6 +451,8 @@ const TerminalView = (() => {
     ws.onclose = () => {
       if (heartbeatInterval) { clearInterval(heartbeatInterval); heartbeatInterval = null; }
       setStatus('error', 'Disconnected');
+      // WebSocket dropped — network may have changed, trigger re-probe
+      if (typeof App.onNetworkChange === 'function') App.onNetworkChange();
     };
 
     ws.onerror = () => {

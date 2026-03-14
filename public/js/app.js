@@ -327,7 +327,7 @@ const App = (() => {
     startLocalProbing();
   }
 
-  return { init, navigate, showModal, getWsUrl, getCurrentSession: () => currentSession, getLocalOrigin: () => localOrigin };
+  return { init, navigate, showModal, getWsUrl, onNetworkChange, getCurrentSession: () => currentSession, getLocalOrigin: () => localOrigin };
 })();
 
 document.addEventListener('DOMContentLoaded', App.init);
