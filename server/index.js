@@ -41,7 +41,7 @@ if (!claudeAvailable) {
   try { execSync('which claude', { stdio: 'ignore' }); claudePath = 'claude'; claudeAvailable = true; } catch { /* not installed */ }
 }
 
-// Track session title state: sessionName → { manuallyRenamed, lastGenAt }
+// Track session title state: sessionName → { manuallyRenamed, lastGenAt, lastLineCount }
 const titleState = new Map();
 
 function extractContext(fullOutput) {
@@ -116,32 +116,44 @@ async function generateTitle(sessionName, force = false) {
 
   // Rename the tmux session
   await run('tmux', ['rename-session', '-t', sessionName, title]);
-  titleState.set(title, { manuallyRenamed: false, lastGenAt: Date.now() });
+  titleState.set(title, { manuallyRenamed: false, lastGenAt: Date.now(), lastLineCount: 0 });
   // Clean old key
   if (title !== sessionName) titleState.delete(sessionName);
 
   return { title, oldName: sessionName };
 }
 
-// Background auto-title: check every 60s for untitled sessions
+// Background auto-title: check every 60s
+// - First title: after 15 lines of output and session > 30s old
+// - Re-title: every 5 minutes if output has grown by 15+ lines since last title
+// - Never touch manually renamed sessions
 setInterval(async () => {
   if (!claudeAvailable) return;
   try {
     const sessionList = await discovery.listSessions();
     for (const s of sessionList) {
       const state = titleState.get(s.name);
-      if (state) continue; // Skip sessions already titled (manually or by AI)
+      if (state && state.manuallyRenamed) continue;
 
-      // Check if session has enough output (> 15 lines)
       try {
         const raw = await run('tmux', ['capture-pane', '-t', s.name, '-p', '-S', '-']);
         const lineCount = raw.split('\n').filter(l => l.trim()).length;
-        if (lineCount < 15) continue;
 
-        // First-time: session must be > 30s old
-        if (!state && Date.now() - s.created < 30000) continue;
+        if (!state) {
+          // Never titled — first-time trigger
+          if (lineCount < 15 || Date.now() - s.created < 30000) continue;
+        } else {
+          // Already titled — re-title after 5min cooldown + 15 new lines
+          if (Date.now() - state.lastGenAt < 300000) continue;
+          if (lineCount - (state.lastLineCount || 0) < 15) continue;
+        }
 
-        await generateTitle(s.name, false);
+        const result = await generateTitle(s.name, false);
+        if (result && result.title) {
+          // Update line count on the new title entry
+          const newState = titleState.get(result.title);
+          if (newState) newState.lastLineCount = lineCount;
+        }
       } catch { /* skip this session */ }
     }
   } catch { /* ignore */ }
