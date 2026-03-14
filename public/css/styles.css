@@ -728,7 +728,7 @@ body {
 .zoom-pill-level {
   font-family: var(--mono);
   font-size: 9px;
-  color: var(--text-muted);
+  color: var(--text);
   text-align: center;
   line-height: 1;
   padding: 1px 0;
