@@ -231,16 +231,19 @@ systemctl --user stop tui-browser-tunnel
 |--------|----------|-------------|
 | `GET` | `/api/discover` | Unified discovery (tmux sessions + Kitty windows) |
 | `GET` | `/api/version` | Server version + build ID + claude availability |
+| `GET` | `/api/network` | Local IPs + HTTPS port for LAN fast-path |
+| `GET` | `/api/health` | Server + tmux + Kitty status |
 | `GET` | `/api/sessions` | List tmux sessions |
 | `GET` | `/api/sessions/:name` | Session details + preview |
 | `GET` | `/api/sessions/:name/info` | Live session stats (memory, CPU, processes, output) |
+| `GET` | `/api/kitty/windows` | Kitty window discovery (debug, prefer `/api/discover`) |
 | `POST` | `/api/sessions` | Create session `{ name, command, cwd }` |
-| `DELETE` | `/api/sessions/:name` | Kill session |
+| `POST` | `/api/sessions/bulk-kill` | Bulk kill `{ names[], filter?, inactiveMinutes? }` |
 | `POST` | `/api/sessions/:name/rename` | Rename `{ newName }` |
 | `POST` | `/api/sessions/:name/open-terminal` | Open Kitty window for session |
 | `POST` | `/api/sessions/:name/generate-title` | AI-generate session title via Claude CLI |
 | `POST` | `/api/shortcuts` | Add custom shortcut `{ label, command }` |
-| `GET` | `/api/health` | Server + tmux + Kitty status |
+| `DELETE` | `/api/sessions/:name` | Kill session |
 
 ### WebSocket
 
