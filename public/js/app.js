@@ -148,7 +148,6 @@ const App = (() => {
   // ---------- Local Network Fast Path ----------
 
   let localOrigin = null;  // e.g. 'https://192.168.0.131:7484'
-  let localProbeInterval = null;
   let certAccepted = false;
   let networkInfo = null; // cached /api/network response
   let probing = false;
@@ -269,18 +268,15 @@ const App = (() => {
 
     updateConnectionMode(localOrigin ? 'local' : 'tunnel');
 
-    // Initial probe
+    // Initial check on load
     probeLocalIPs();
 
-    // Periodic probe every 15 seconds
-    localProbeInterval = setInterval(probeLocalIPs, 15000);
-
-    // Instant re-probe on network changes
+    // Re-check on network changes, phone wake, tab focus — no polling
     window.addEventListener('online', onNetworkChange);
+    window.addEventListener('offline', () => { if (localOrigin) switchTo(null, 'tunnel'); });
     if (navigator.connection) {
       navigator.connection.addEventListener('change', onNetworkChange);
     }
-    // Also re-probe on visibility change (phone wake / tab focus)
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') onNetworkChange();
     });
