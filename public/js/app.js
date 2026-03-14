@@ -217,12 +217,26 @@ const App = (() => {
       if (raceResult) {
         switchTo(raceResult, 'local');
       } else {
-        // No local IP reachable — prompt cert setup if never done
-        if (!certAccepted && networkInfo.localIPs.length > 0 && !probeLocalIPs._prompted) {
-          probeLocalIPs._prompted = true;
-          const el = document.getElementById('connection-mode');
-          if (el) {
-            el.innerHTML = `<a href="/setup-local.html" title="Setup local fast-path" style="color:var(--orange);font-family:var(--mono);font-size:9px;text-decoration:underline">setup local</a>`;
+        // HTTPS failed — check if HTTP is reachable (IP on network but cert not accepted)
+        if (!certAccepted && networkInfo.localIPs.length > 0) {
+          let httpReachable = false;
+          for (const ip of networkInfo.localIPs) {
+            try {
+              const controller = new AbortController();
+              const t = setTimeout(() => controller.abort(), 1000);
+              const r = await fetch(`http://${ip}:${networkInfo.httpPort}/api/version`, { signal: controller.signal, mode: 'no-cors' });
+              clearTimeout(t);
+              httpReachable = true;
+              break;
+            } catch { /* not reachable */ }
+          }
+          // Only show setup link if IP is reachable but HTTPS cert is the blocker
+          if (httpReachable && !probeLocalIPs._prompted) {
+            probeLocalIPs._prompted = true;
+            const el = document.getElementById('connection-mode');
+            if (el) {
+              el.innerHTML = `<a href="/setup-local.html" title="Setup local fast-path" style="color:var(--orange);font-family:var(--mono);font-size:9px;text-decoration:underline">setup local</a>`;
+            }
           }
         }
         if (localOrigin) switchTo(null, 'tunnel');
