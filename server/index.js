@@ -41,8 +41,21 @@ if (!claudeAvailable) {
   try { execSync('which claude', { stdio: 'ignore' }); claudePath = 'claude'; claudeAvailable = true; } catch { /* not installed */ }
 }
 
-// Track session title state: sessionName → { manuallyRenamed, lastGenAt, lastLineCount }
-const titleState = new Map();
+// Display titles: tmuxName → { title, manuallyRenamed, lastGenAt, lastLineCount }
+// Persisted to disk so titles survive server restarts
+const displayTitles = new Map();
+const titlesPath = path.join(__dirname, '..', 'data', 'display-titles.json');
+try {
+  fs.mkdirSync(path.join(__dirname, '..', 'data'), { recursive: true });
+  const saved = JSON.parse(fs.readFileSync(titlesPath, 'utf8'));
+  for (const [k, v] of Object.entries(saved)) displayTitles.set(k, v);
+} catch { /* no saved titles */ }
+
+function saveTitles() {
+  try {
+    fs.writeFileSync(titlesPath, JSON.stringify(Object.fromEntries(displayTitles), null, 2));
+  } catch { /* ignore */ }
+}
 
 function extractContext(fullOutput) {
   const lines = fullOutput.split('\n');
@@ -99,13 +112,14 @@ ${context}`);
 async function generateTitle(sessionName, force = false) {
   if (!claudeAvailable) throw new Error('claude CLI not available');
 
-  const state = titleState.get(sessionName);
+  const state = displayTitles.get(sessionName);
   if (state && state.manuallyRenamed && !force) {
     return { skipped: true, reason: 'manually renamed' };
   }
 
   // Capture scrollback
   const raw = await run('tmux', ['capture-pane', '-t', sessionName, '-p', '-S', '-']);
+  const lineCount = raw.split('\n').filter(l => l.trim()).length;
   const context = extractContext(raw);
   if (!context || context.length < 20) {
     return { skipped: true, reason: 'not enough output' };
@@ -114,13 +128,11 @@ async function generateTitle(sessionName, force = false) {
   const title = await runClaudeForTitle(context);
   if (!title) throw new Error('empty title from claude');
 
-  // Rename the tmux session
-  await run('tmux', ['rename-session', '-t', sessionName, title]);
-  titleState.set(title, { manuallyRenamed: false, lastGenAt: Date.now(), lastLineCount: 0 });
-  // Clean old key
-  if (title !== sessionName) titleState.delete(sessionName);
+  // Store as display title — tmux session name stays unchanged
+  displayTitles.set(sessionName, { title, manuallyRenamed: false, lastGenAt: Date.now(), lastLineCount: lineCount });
+  saveTitles();
 
-  return { title, oldName: sessionName };
+  return { title, sessionName };
 }
 
 // Background auto-title: check every 60s
@@ -132,7 +144,7 @@ setInterval(async () => {
   try {
     const sessionList = await discovery.listSessions();
     for (const s of sessionList) {
-      const state = titleState.get(s.name);
+      const state = displayTitles.get(s.name);
       if (state && state.manuallyRenamed) continue;
 
       try {
@@ -143,17 +155,12 @@ setInterval(async () => {
           // Never titled — first-time trigger
           if (lineCount < 15 || Date.now() - s.created < 30000) continue;
         } else {
-          // Already titled — re-title after 5min cooldown + 15 new lines
+          // Already titled — re-title after 5min cooldown + 300 new lines
           if (Date.now() - state.lastGenAt < 300000) continue;
-          if (lineCount - (state.lastLineCount || 0) < 15) continue;
+          if (lineCount - (state.lastLineCount || 0) < 300) continue;
         }
 
-        const result = await generateTitle(s.name, false);
-        if (result && result.title) {
-          // Update line count on the new title entry
-          const newState = titleState.get(result.title);
-          if (newState) newState.lastLineCount = lineCount;
-        }
+        await generateTitle(s.name, false);
       } catch { /* skip this session */ }
     }
   } catch { /* ignore */ }
@@ -183,8 +190,12 @@ function apiHandler(fn) {
   };
 }
 
-function annotateWebClients(sessionList) {
-  for (const s of sessionList) s.webClients = sessions.getClientCount(s.name);
+function annotateSessions(sessionList) {
+  for (const s of sessionList) {
+    s.webClients = sessions.getClientCount(s.name);
+    const dt = displayTitles.get(s.name);
+    if (dt && dt.title) s.displayTitle = dt.title;
+  }
 }
 
 // ---------- REST API ----------
@@ -202,7 +213,7 @@ app.get('/api/health', async (_req, res) => {
 
 app.get('/api/sessions', apiHandler(async (_req, res) => {
   const list = await discovery.listSessions();
-  annotateWebClients(list);
+  annotateSessions(list);
   res.json(list);
 }));
 
@@ -210,6 +221,8 @@ app.get('/api/sessions/:name', apiHandler(async (req, res) => {
   const detail = await discovery.getSessionDetail(req.params.name);
   if (!detail) return res.status(404).json({ error: 'Session not found' });
   detail.webClients = sessions.getClientCount(detail.name);
+  const dt = displayTitles.get(detail.name);
+  if (dt && dt.title) detail.displayTitle = dt.title;
   res.json(detail);
 }));
 
@@ -242,7 +255,7 @@ app.get('/api/kitty/windows', apiHandler(async (_req, res) => {
 // Unified discovery — tmux sessions + kitty windows in one call
 app.get('/api/discover', apiHandler(async (_req, res) => {
   const result = await discovery.discoverAll();
-  annotateWebClients(result.sessions);
+  annotateSessions(result.sessions);
   res.json(result);
 }));
 
@@ -345,11 +358,9 @@ app.post('/api/sessions/:name/rename', apiHandler(async (req, res) => {
   if (!newName || !newName.trim()) {
     return res.status(400).json({ error: 'New name is required' });
   }
-  const trimmed = newName.trim();
-  await sessions.renameSession(req.params.name, trimmed);
-  // Mark as manually renamed so auto-title skips it
-  titleState.delete(req.params.name);
-  titleState.set(trimmed, { manuallyRenamed: true, lastGenAt: Date.now() });
+  // Store as display title — tmux session name stays stable as the identifier
+  displayTitles.set(req.params.name, { title: newName.trim(), manuallyRenamed: true, lastGenAt: Date.now(), lastLineCount: 0 });
+  saveTitles();
   res.json({ ok: true });
 }));
 

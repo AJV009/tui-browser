@@ -42,6 +42,10 @@ const App = (() => {
       backBtn.style.display = 'inline-flex';
       document.getElementById('terminal-session-name').textContent = sessionName;
       TerminalView.connect(sessionName);
+      // Fetch display title if available
+      fetch(`/api/sessions/${encodeURIComponent(sessionName)}`).then(r => r.json()).then(d => {
+        if (d.displayTitle) document.getElementById('terminal-session-name').textContent = d.displayTitle;
+      }).catch(() => {});
     } else {
       currentView = 'dashboard';
       currentSession = null;
