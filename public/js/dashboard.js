@@ -24,7 +24,104 @@ const Dashboard = (() => {
       }
     });
 
+    initShortcuts();
     startAutoRefresh();
+  }
+
+  // ---------- Shortcuts ----------
+
+  let shortcutsData = [];
+  let backdrop = null;
+
+  async function initShortcuts() {
+    const btn = document.getElementById('shortcuts-btn');
+    const menu = document.getElementById('shortcuts-menu');
+
+    try {
+      const res = await fetch('/shortcuts.json');
+      if (!res.ok) throw new Error('No shortcuts');
+      shortcutsData = await res.json();
+      if (!shortcutsData.length) { btn.style.display = 'none'; return; }
+
+      menu.innerHTML = shortcutsData.map((s, i) => `
+        <div class="shortcut-item" data-shortcut-idx="${i}">
+          <span class="shortcut-label">${esc(s.label)}</span>
+          <span class="shortcut-cmd">${esc(s.command)}</span>
+        </div>`).join('');
+    } catch {
+      btn.style.display = 'none';
+      return;
+    }
+
+    // Create backdrop element (reused)
+    backdrop = document.createElement('div');
+    backdrop.className = 'shortcuts-backdrop hidden';
+    document.body.appendChild(backdrop);
+
+    // Move menu to body so it's not clipped by overflow parents
+    document.body.appendChild(menu);
+
+    btn.addEventListener('click', () => {
+      const isOpen = !menu.classList.contains('hidden');
+      if (isOpen) { closeShortcuts(); return; }
+      openShortcuts(btn, menu);
+    });
+
+    backdrop.addEventListener('click', closeShortcuts);
+
+    menu.addEventListener('click', (e) => {
+      const item = e.target.closest('.shortcut-item');
+      if (!item) return;
+      const idx = parseInt(item.dataset.shortcutIdx, 10);
+      if (shortcutsData[idx]) launchShortcut(shortcutsData[idx]);
+      closeShortcuts();
+    });
+  }
+
+  function openShortcuts(btn, menu) {
+    const isMobile = window.innerWidth <= 768;
+
+    if (!isMobile) {
+      // Desktop: position below the button
+      const rect = btn.getBoundingClientRect();
+      menu.style.top = (rect.bottom + 4) + 'px';
+      menu.style.right = (window.innerWidth - rect.right) + 'px';
+      menu.style.left = '';
+      menu.style.bottom = '';
+    }
+    // Mobile: CSS handles positioning (bottom sheet)
+
+    backdrop.classList.remove('hidden');
+    menu.classList.remove('hidden');
+  }
+
+  function closeShortcuts() {
+    const menu = document.getElementById('shortcuts-menu');
+    if (menu) menu.classList.add('hidden');
+    if (backdrop) backdrop.classList.add('hidden');
+  }
+
+  async function launchShortcut(shortcut) {
+    // Auto-generate session name from label
+    const base = shortcut.label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    const name = base + '-' + Date.now().toString(36).slice(-4);
+
+    try {
+      const res = await fetch('/api/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, command: shortcut.command }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        await showModal(err.error || 'Failed to launch shortcut', 'OK');
+        return;
+      }
+      // Connect to the new session immediately
+      connectTo(name);
+    } catch (err) {
+      await showModal('Failed to launch shortcut: ' + err.message, 'OK');
+    }
   }
 
   async function refresh() {

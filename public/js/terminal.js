@@ -131,6 +131,21 @@ const TerminalView = (() => {
       if (term) term.focus();
     });
 
+    // Quick-keys bar — feed input through xterm so onData fires normally
+    const QK_MAP = {
+      'esc': '\x1b', 'tab': '\t',
+      'ctrl-c': '\x03', 'ctrl-d': '\x04', 'ctrl-z': '\x1a',
+      'up': '\x1b[A', 'down': '\x1b[B', 'left': '\x1b[D', 'right': '\x1b[C',
+    };
+
+    document.getElementById('terminal-quickbar').addEventListener('touchstart', (e) => {
+      const btn = e.target.closest('.qk');
+      if (!btn) return;
+      e.preventDefault();
+      const seq = QK_MAP[btn.dataset.qk];
+      if (seq && term) term.input(seq, true);
+    }, { passive: false });
+
     updateZoomLabel();
   }
 
