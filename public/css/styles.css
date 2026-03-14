@@ -876,7 +876,7 @@ body {
   align-items: center;
   justify-content: center;
   padding: 2px 0;
-  color: var(--text-muted);
+  color: #999;
   border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
   width: 100%;
