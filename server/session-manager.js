@@ -7,19 +7,21 @@
  */
 
 const pty = require('node-pty');
-const { execFile, spawn } = require('child_process');
+const { spawn } = require('child_process');
+const { exec } = require('./exec-util');
 
-function exec(cmd, args) {
-  return new Promise((resolve, reject) => {
-    execFile(cmd, args, { timeout: 5000 }, (err, stdout) => {
-      if (err) return reject(err);
-      resolve((stdout || '').trimEnd());
-    });
-  });
-}
+// Locale env for tmux UTF-8 support (also in scripts/tmux-kitty-shell)
+const LOCALE_ENV = { LANG: 'en_IN.UTF-8', LC_ALL: 'en_IN.UTF-8' };
 
 // sessionName → { proc: pty.IPty, clients: Set<WebSocket> }
 const activeSessions = new Map();
+
+function closeClient(client, sessionName) {
+  try {
+    client.send(JSON.stringify({ type: 'session-ended', sessionName }));
+    client.close();
+  } catch { /* ignore */ }
+}
 
 /**
  * Attach a WebSocket client to a tmux session.
@@ -30,12 +32,12 @@ function attachClient(sessionName, ws, cols = 80, rows = 24) {
   let entry = activeSessions.get(sessionName);
 
   if (!entry) {
-    const proc = pty.spawn('tmux', ['attach-session', '-t', sessionName], {
+    const proc = pty.spawn('tmux', ['-u', 'attach-session', '-t', sessionName], {
       name: 'xterm-256color',
       cols,
       rows,
       cwd: process.env.HOME,
-      env: { ...process.env, TERM: 'xterm-256color' },
+      env: { ...process.env, TERM: 'xterm-256color', ...LOCALE_ENV },
     });
 
     entry = { proc, clients: new Set() };
@@ -52,15 +54,7 @@ function attachClient(sessionName, ws, cols = 80, rows = 24) {
     });
 
     proc.onExit(() => {
-      // pty exited — close all clients and clean up
-      for (const client of entry.clients) {
-        try {
-          client.send(JSON.stringify({ type: 'session-ended', sessionName }));
-          client.close();
-        } catch {
-          // ignore
-        }
-      }
+      for (const client of entry.clients) closeClient(client, sessionName);
       activeSessions.delete(sessionName);
     });
   }
@@ -115,7 +109,7 @@ function detachClient(sessionName, ws) {
  * Create a new tmux session.
  */
 async function createSession(name, command = 'bash', cols = 80, rows = 24, cwd) {
-  const args = ['new-session', '-d', '-s', name, '-x', String(cols), '-y', String(rows)];
+  const args = ['-u', 'new-session', '-d', '-s', name, '-x', String(cols), '-y', String(rows)];
   if (cwd) {
     args.push('-c', cwd);
   }
@@ -126,9 +120,10 @@ async function createSession(name, command = 'bash', cols = 80, rows = 24, cwd) 
 
   // Best-effort: open a Kitty window attached to this session
   try {
-    const kittyProc = spawn('kitty', ['-e', 'tmux', 'attach-session', '-t', name], {
+    const kittyProc = spawn('kitty', ['-e', 'tmux', '-u', 'attach-session', '-t', name], {
       detached: true,
       stdio: 'ignore',
+      env: { ...process.env, ...LOCALE_ENV },
     });
     kittyProc.on('error', (err) => {
       console.warn(`[session-manager] Kitty launch failed for session ${name}:`, err.message);
@@ -148,14 +143,7 @@ async function killSession(name) {
   // Clean up any active pty attachment first
   const entry = activeSessions.get(name);
   if (entry) {
-    for (const client of entry.clients) {
-      try {
-        client.send(JSON.stringify({ type: 'session-ended', sessionName: name }));
-        client.close();
-      } catch {
-        // ignore
-      }
-    }
+    for (const client of entry.clients) closeClient(client, name);
     entry.proc.kill();
     activeSessions.delete(name);
   }
@@ -184,19 +172,8 @@ function getClientCount(sessionName) {
  */
 function shutdown() {
   for (const [sessionName, entry] of activeSessions) {
-    for (const client of entry.clients) {
-      try {
-        client.send(JSON.stringify({ type: 'session-ended', sessionName }));
-        client.close();
-      } catch {
-        // ignore
-      }
-    }
-    try {
-      entry.proc.kill();
-    } catch {
-      // ignore
-    }
+    for (const client of entry.clients) closeClient(client, sessionName);
+    try { entry.proc.kill(); } catch { /* ignore */ }
   }
   activeSessions.clear();
 }

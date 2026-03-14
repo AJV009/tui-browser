@@ -21,6 +21,22 @@ const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
+// ---------- Helpers ----------
+
+function apiHandler(fn) {
+  return async (req, res) => {
+    try {
+      await fn(req, res);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  };
+}
+
+function annotateWebClients(sessionList) {
+  for (const s of sessionList) s.webClients = sessions.getClientCount(s.name);
+}
+
 // ---------- REST API ----------
 
 app.get('/api/health', async (_req, res) => {
@@ -30,95 +46,60 @@ app.get('/api/health', async (_req, res) => {
   res.json({ tmux: tmuxOk, server: serverOk, kitty: kittyStatus.available });
 });
 
-app.get('/api/sessions', async (_req, res) => {
-  try {
-    const list = await discovery.listSessions();
-    // annotate with web client counts
-    for (const s of list) {
-      s.webClients = sessions.getClientCount(s.name);
-    }
-    res.json(list);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+app.get('/api/sessions', apiHandler(async (_req, res) => {
+  const list = await discovery.listSessions();
+  annotateWebClients(list);
+  res.json(list);
+}));
 
-app.get('/api/sessions/:name', async (req, res) => {
-  try {
-    const detail = await discovery.getSessionDetail(req.params.name);
-    if (!detail) return res.status(404).json({ error: 'Session not found' });
-    detail.webClients = sessions.getClientCount(detail.name);
-    res.json(detail);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+app.get('/api/sessions/:name', apiHandler(async (req, res) => {
+  const detail = await discovery.getSessionDetail(req.params.name);
+  if (!detail) return res.status(404).json({ error: 'Session not found' });
+  detail.webClients = sessions.getClientCount(detail.name);
+  res.json(detail);
+}));
 
-app.post('/api/sessions', async (req, res) => {
+app.post('/api/sessions', apiHandler(async (req, res) => {
   const { name, command, cwd } = req.body || {};
   if (!name || !name.trim()) {
     return res.status(400).json({ error: 'Session name is required' });
   }
-  // Validate cwd if provided: must be absolute path, no null bytes
   if (cwd != null) {
     if (typeof cwd !== 'string' || !cwd.startsWith('/') || cwd.includes('\0')) {
       return res.status(400).json({ error: 'Invalid cwd: must be an absolute path' });
     }
   }
-  try {
-    const result = await sessions.createSession(name.trim(), command || 'bash', 80, 24, cwd);
-    res.status(201).json(result);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+  const result = await sessions.createSession(name.trim(), command || 'bash', 80, 24, cwd);
+  res.status(201).json(result);
+}));
 
-app.delete('/api/sessions/:name', async (req, res) => {
-  try {
-    await sessions.killSession(req.params.name);
-    res.json({ ok: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+app.delete('/api/sessions/:name', apiHandler(async (req, res) => {
+  await sessions.killSession(req.params.name);
+  res.json({ ok: true });
+}));
 
 // Deprecated: Kitty discovery is now part of /api/discover unified response.
 // Kept for debugging purposes.
-app.get('/api/kitty/windows', async (_req, res) => {
-  try {
-    const result = await kittyDiscovery.discoverKittyWindows();
-    res.json(result);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+app.get('/api/kitty/windows', apiHandler(async (_req, res) => {
+  const result = await kittyDiscovery.discoverKittyWindows();
+  res.json(result);
+}));
 
 // Unified discovery — tmux sessions + kitty windows in one call
-app.get('/api/discover', async (_req, res) => {
-  try {
-    const result = await discovery.discoverAll();
-    // annotate unified sessions with web client counts
-    for (const s of result.sessions) {
-      s.webClients = sessions.getClientCount(s.name);
-    }
-    res.json(result);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+app.get('/api/discover', apiHandler(async (_req, res) => {
+  const result = await discovery.discoverAll();
+  annotateWebClients(result.sessions);
+  res.json(result);
+}));
 
-app.post('/api/sessions/:name/rename', async (req, res) => {
+app.post('/api/sessions/:name/rename', apiHandler(async (req, res) => {
   const { newName } = req.body || {};
   if (!newName || !newName.trim()) {
     return res.status(400).json({ error: 'New name is required' });
   }
-  try {
-    await sessions.renameSession(req.params.name, newName.trim());
-    res.json({ ok: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+  await sessions.renameSession(req.params.name, newName.trim());
+  res.json({ ok: true });
+}));
 
 // ---------- HTTP + WebSocket ----------
 
