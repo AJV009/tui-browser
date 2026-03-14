@@ -44,3 +44,23 @@ set -g set-titles-string '#T'
 ```
 map shift+enter send_text normal,application \n
 ```
+
+## Kitty kittens don't work (e.g., theme picker)
+
+**Problem:** Kitty kittens like `kitty +kitten themes` run inside tmux, which intercepts keystrokes. Enter, arrow keys, and other inputs don't reach the kitten.
+
+**Fix:** Launch a fresh Kitty window that bypasses tmux:
+
+```
+kitty --override shell=/bin/zsh -e kitten themes
+```
+
+## Close tab always asks for confirmation
+
+**Problem:** Closing a tab with `Ctrl+Shift+Q` always prompts "are you sure?" because tmux is always detected as a running process.
+
+**Fix:** Disable the confirmation in `kitty.conf`:
+
+```
+confirm_os_window_close 0
+```
