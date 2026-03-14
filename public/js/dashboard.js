@@ -8,6 +8,19 @@
 const Dashboard = (() => {
   let refreshInterval = null;
   const REFRESH_MS = 3000;
+  let sortMode = 'recent'; // 'recent' | 'oldest' | 'active' | 'idle'
+  let lastSessions = null;
+  let lastUnmatchedKitty = null;
+
+  // Inline SVG icons (22x22, fill the 38px btn-icon buttons properly)
+  const ICON = {
+    connect: '<svg width="22" height="22" viewBox="0 0 22 22" fill="currentColor"><path d="M7 3.5v15l11-7.5z"/></svg>',
+    kill: '<svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6l10 10M16 6l-10 10"/></svg>',
+    monitor: '<svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="18" height="12" rx="2"/><path d="M8 19h6M11 16v3"/></svg>',
+    info: '<svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8.5"/><path d="M11 10v5.5M11 7v.01" stroke-linecap="round"/></svg>',
+  };
+
+  let infoInterval = null;
 
   function init() {
     document.getElementById('create-session-form').addEventListener('submit', handleCreate);
@@ -19,9 +32,47 @@ const Dashboard = (() => {
       const action = btn.dataset.action;
       if (action === 'connect') {
         connectTo(btn.dataset.session);
+      } else if (action === 'open-terminal') {
+        openOnPC(btn.dataset.session, btn);
+      } else if (action === 'info') {
+        openInfo(btn.dataset.session);
       } else if (action === 'kill') {
         kill(btn.dataset.session);
       }
+    });
+
+    // Double-tap on session card to connect
+    let lastTap = 0;
+    let lastTapSession = null;
+    document.getElementById('session-list').addEventListener('click', (e) => {
+      if (e.target.closest('[data-action]')) return; // ignore button clicks
+      const card = e.target.closest('.session-card[data-session]');
+      if (!card) return;
+      const session = card.dataset.session;
+      const now = Date.now();
+      if (session === lastTapSession && now - lastTap < 400) {
+        connectTo(session);
+        lastTap = 0;
+        lastTapSession = null;
+      } else {
+        lastTap = now;
+        lastTapSession = session;
+      }
+    });
+
+    document.getElementById('info-close').addEventListener('click', closeInfo);
+
+    document.getElementById('sort-select').addEventListener('change', (e) => {
+      sortMode = e.target.value;
+      refresh();
+    });
+
+    // Render cached data instantly (no flash of empty state)
+    renderFromCache();
+
+    // Refresh immediately on phone wake / tab focus
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') refresh();
     });
 
     initShortcuts();
@@ -39,19 +90,22 @@ const Dashboard = (() => {
 
     try {
       const res = await fetch('/shortcuts.json');
-      if (!res.ok) throw new Error('No shortcuts');
-      shortcutsData = await res.json();
-      if (!shortcutsData.length) { btn.style.display = 'none'; return; }
+      if (res.ok) shortcutsData = await res.json();
+    } catch { /* no shortcuts file */ }
 
-      menu.innerHTML = shortcutsData.map((s, i) => `
-        <div class="shortcut-item" data-shortcut-idx="${i}">
-          <span class="shortcut-label">${esc(s.label)}</span>
-          <span class="shortcut-cmd">${esc(s.command)}</span>
-        </div>`).join('');
-    } catch {
-      btn.style.display = 'none';
-      return;
-    }
+    let menuHtml = shortcutsData.map((s, i) => `
+      <div class="shortcut-item" data-shortcut-idx="${i}">
+        <span class="shortcut-label">${esc(s.label)}</span>
+        <span class="shortcut-cmd">${esc(s.command)}</span>
+      </div>`).join('');
+
+    // Always add the custom command option
+    menuHtml += `<div class="shortcut-item shortcut-custom" data-action="custom">
+      <span class="shortcut-label">+ Custom command</span>
+      <span class="shortcut-cmd">Launch a session with any command</span>
+    </div>`;
+
+    menu.innerHTML = menuHtml;
 
     // Create backdrop element (reused)
     backdrop = document.createElement('div');
@@ -72,9 +126,13 @@ const Dashboard = (() => {
     menu.addEventListener('click', (e) => {
       const item = e.target.closest('.shortcut-item');
       if (!item) return;
+      closeShortcuts();
+      if (item.dataset.action === 'custom') {
+        showCustomCommandPopup();
+        return;
+      }
       const idx = parseInt(item.dataset.shortcutIdx, 10);
       if (shortcutsData[idx]) launchShortcut(shortcutsData[idx]);
-      closeShortcuts();
     });
   }
 
@@ -95,10 +153,72 @@ const Dashboard = (() => {
     menu.classList.remove('hidden');
   }
 
+  function rebuildShortcutsMenu() {
+    const menu = document.getElementById('shortcuts-menu');
+    let menuHtml = shortcutsData.map((s, i) => `
+      <div class="shortcut-item" data-shortcut-idx="${i}">
+        <span class="shortcut-label">${esc(s.label)}</span>
+        <span class="shortcut-cmd">${esc(s.command)}</span>
+      </div>`).join('');
+    menuHtml += `<div class="shortcut-item shortcut-custom" data-action="custom">
+      <span class="shortcut-label">+ Custom command</span>
+      <span class="shortcut-cmd">Launch a session with any command</span>
+    </div>`;
+    menu.innerHTML = menuHtml;
+  }
+
   function closeShortcuts() {
     const menu = document.getElementById('shortcuts-menu');
     if (menu) menu.classList.add('hidden');
     if (backdrop) backdrop.classList.add('hidden');
+  }
+
+  function showCustomCommandPopup() {
+    const overlay = document.getElementById('modal-overlay');
+    const modal = overlay.querySelector('.modal');
+    const msg = document.getElementById('modal-message');
+    const confirmBtn = document.getElementById('modal-confirm');
+    const cancelBtn = document.getElementById('modal-cancel');
+
+    msg.innerHTML = `
+      <div style="margin-bottom:12px;font-family:var(--mono);font-size:13px;font-weight:600;color:var(--accent)">Custom Command</div>
+      <input id="custom-label" type="text" placeholder="Title (e.g. My Server)" autocomplete="off" style="width:100%;padding:8px 10px;margin-bottom:8px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--mono);font-size:12px;outline:none;">
+      <input id="custom-cmd" type="text" placeholder="Command (e.g. cd ~/app && npm start)" autocomplete="off" style="width:100%;padding:8px 10px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--mono);font-size:12px;outline:none;">`;
+
+    overlay.classList.remove('hidden');
+    setTimeout(() => document.getElementById('custom-label').focus(), 50);
+
+    function cleanup() {
+      overlay.classList.add('hidden');
+      confirmBtn.removeEventListener('click', onConfirm);
+      cancelBtn.removeEventListener('click', onCancel);
+    }
+
+    async function onConfirm() {
+      const label = document.getElementById('custom-label').value.trim();
+      const cmd = document.getElementById('custom-cmd').value.trim();
+      cleanup();
+      if (!label || !cmd) return;
+      // Save to shortcuts.json, rebuild menu, then launch
+      try {
+        const res = await fetch('/api/shortcuts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ label, command: cmd }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          shortcutsData = data.shortcuts;
+          rebuildShortcutsMenu();
+        }
+      } catch { /* save failed, still launch */ }
+      launchShortcut({ label, command: cmd });
+    }
+
+    function onCancel() { cleanup(); }
+
+    confirmBtn.addEventListener('click', onConfirm);
+    cancelBtn.addEventListener('click', onCancel);
   }
 
   async function launchShortcut(shortcut) {
@@ -114,13 +234,13 @@ const Dashboard = (() => {
       });
       if (!res.ok) {
         const err = await res.json();
-        await showModal(err.error || 'Failed to launch shortcut', 'OK');
+        await App.showModal(err.error || 'Failed to launch shortcut', 'OK');
         return;
       }
       // Connect to the new session immediately
       connectTo(name);
     } catch (err) {
-      await showModal('Failed to launch shortcut: ' + err.message, 'OK');
+      await App.showModal('Failed to launch shortcut: ' + err.message, 'OK');
     }
   }
 
@@ -129,10 +249,27 @@ const Dashboard = (() => {
       const res = await fetch('/api/discover');
       if (!res.ok) throw new Error(res.statusText);
       const data = await res.json();
-      render(data.sessions || [], data.unmatchedKitty || []);
-    } catch (err) {
-      renderError(err.message);
+      lastSessions = data.sessions || [];
+      lastUnmatchedKitty = data.unmatchedKitty || [];
+      // Cache for instant render on next load
+      try { localStorage.setItem('tui_sessions_cache', JSON.stringify({ sessions: lastSessions, unmatchedKitty: lastUnmatchedKitty })); } catch { /* quota */ }
+      render(lastSessions, lastUnmatchedKitty);
+    } catch {
+      // On error, keep existing content — don't wipe the list
+      // Only show error if we have nothing at all
+      if (!lastSessions) renderError('Connecting\u2026');
     }
+  }
+
+  function renderFromCache() {
+    try {
+      const cached = JSON.parse(localStorage.getItem('tui_sessions_cache'));
+      if (cached && cached.sessions) {
+        lastSessions = cached.sessions;
+        lastUnmatchedKitty = cached.unmatchedKitty || [];
+        render(lastSessions, lastUnmatchedKitty);
+      }
+    } catch { /* no cache */ }
   }
 
   function render(sessions, unmatchedKitty) {
@@ -147,8 +284,19 @@ const Dashboard = (() => {
       return;
     }
 
+    // Sort sessions
+    const sorted = [...sessions].sort((a, b) => {
+      switch (sortMode) {
+        case 'recent': return b.created - a.created;
+        case 'oldest': return a.created - b.created;
+        case 'active': return (b.lastActivity || 0) - (a.lastActivity || 0);
+        case 'idle': return (a.lastActivity || 0) - (b.lastActivity || 0);
+        default: return 0;
+      }
+    });
+
     let html = '';
-    html += sessions.map(renderSessionCard).join('');
+    html += sorted.map(renderSessionCard).join('');
 
     if (unmatchedKitty.length > 0) {
       html += renderUnmatchedKitty(unmatchedKitty);
@@ -209,8 +357,10 @@ const Dashboard = (() => {
           <span>${created}</span>
         </div>
         <div class="session-actions">
-          <button class="btn btn-primary" data-action="connect" data-session="${esc(s.name)}">Connect</button>
-          <button class="btn btn-danger" data-action="kill" data-session="${esc(s.name)}">Kill</button>
+          <button class="btn btn-primary btn-icon" data-action="connect" data-session="${esc(s.name)}" title="Connect">${ICON.connect}</button>
+          <button class="btn btn-secondary btn-icon" data-action="open-terminal" data-session="${esc(s.name)}" title="Open on PC">${ICON.monitor}</button>
+          <button class="btn btn-secondary btn-icon" data-action="info" data-session="${esc(s.name)}" title="Session info">${ICON.info}</button>
+          <button class="btn btn-danger btn-icon" data-action="kill" data-session="${esc(s.name)}" title="Kill">${ICON.kill}</button>
         </div>
       </div>`;
   }
@@ -244,12 +394,15 @@ const Dashboard = (() => {
   }
 
   function renderError(msg) {
+    // Only show error if we have no content at all
     const list = document.getElementById('session-list');
-    list.innerHTML = `
-      <div class="empty-state">
-        <h3>Cannot reach server</h3>
-        <p>${esc(msg)}</p>
-      </div>`;
+    if (list.children.length === 0) {
+      list.innerHTML = `
+        <div class="empty-state">
+          <h3>Cannot reach server</h3>
+          <p>${esc(msg)}</p>
+        </div>`;
+    }
   }
 
   async function handleCreate(e) {
@@ -269,14 +422,14 @@ const Dashboard = (() => {
       });
       if (!res.ok) {
         const err = await res.json();
-        await showModal(err.error || 'Failed to create session', 'OK');
+        await App.showModal(err.error || 'Failed to create session', 'OK');
         return;
       }
       nameInput.value = '';
       cmdInput.value = '';
       await refresh();
     } catch (err) {
-      await showModal('Failed to create session: ' + err.message, 'OK');
+      await App.showModal('Failed to create session: ' + err.message, 'OK');
     }
   }
 
@@ -284,32 +437,19 @@ const Dashboard = (() => {
     App.navigate('terminal', { session: sessionName });
   }
 
-  function showModal(message, confirmLabel = 'Confirm') {
-    return new Promise((resolve) => {
-      const overlay = document.getElementById('modal-overlay');
-      const msg = document.getElementById('modal-message');
-      const confirmBtn = document.getElementById('modal-confirm');
-      const cancelBtn = document.getElementById('modal-cancel');
-      msg.textContent = message;
-      confirmBtn.textContent = confirmLabel;
-      overlay.classList.remove('hidden');
-
-      function cleanup(result) {
-        overlay.classList.add('hidden');
-        confirmBtn.removeEventListener('click', onConfirm);
-        cancelBtn.removeEventListener('click', onCancel);
-        resolve(result);
-      }
-      function onConfirm() { cleanup(true); }
-      function onCancel() { cleanup(false); }
-
-      confirmBtn.addEventListener('click', onConfirm);
-      cancelBtn.addEventListener('click', onCancel);
-    });
+  async function openOnPC(sessionName, btn) {
+    try {
+      btn.disabled = true;
+      btn.style.opacity = '0.5';
+      await fetch(`/api/sessions/${encodeURIComponent(sessionName)}/open-terminal`, { method: 'POST' });
+      setTimeout(() => { btn.disabled = false; btn.style.opacity = ''; }, 2000);
+    } catch {
+      setTimeout(() => { btn.disabled = false; btn.style.opacity = ''; }, 2000);
+    }
   }
 
   async function kill(sessionName) {
-    const confirmed = await showModal(
+    const confirmed = await App.showModal(
       `Kill session "${sessionName}"? This will terminate all processes in it.`,
       'Kill'
     );
@@ -318,7 +458,7 @@ const Dashboard = (() => {
       await fetch(`/api/sessions/${encodeURIComponent(sessionName)}`, { method: 'DELETE' });
       await refresh();
     } catch (err) {
-      await showModal('Failed to kill session: ' + err.message, 'OK');
+      await App.showModal('Failed to kill session: ' + err.message, 'OK');
     }
   }
 
@@ -330,6 +470,109 @@ const Dashboard = (() => {
         refresh();
       }
     }, REFRESH_MS);
+  }
+
+  // ---------- Session Info Panel ----------
+
+  function openInfo(sessionName) {
+    document.getElementById('info-session-name').textContent = sessionName;
+    document.getElementById('session-info-overlay').classList.remove('hidden');
+    document.getElementById('info-body').innerHTML = '<div style="padding:20px;color:var(--text-muted);font-family:var(--mono);font-size:12px;">Loading\u2026</div>';
+    fetchInfo(sessionName);
+    infoInterval = setInterval(() => fetchInfo(sessionName), 2000);
+  }
+
+  function closeInfo() {
+    document.getElementById('session-info-overlay').classList.add('hidden');
+    if (infoInterval) { clearInterval(infoInterval); infoInterval = null; }
+  }
+
+  async function fetchInfo(sessionName) {
+    try {
+      const res = await fetch(`/api/sessions/${encodeURIComponent(sessionName)}/info`);
+      if (!res.ok) throw new Error('Session not found');
+      const data = await res.json();
+      renderInfo(data);
+    } catch (err) {
+      document.getElementById('info-body').innerHTML =
+        `<div style="padding:20px;color:var(--danger);font-family:var(--mono);font-size:12px;">${esc(err.message)}</div>`;
+      closeInfo();
+    }
+  }
+
+  function renderInfo(d) {
+    const now = Math.floor(Date.now() / 1000);
+    const uptime = formatDuration(now - d.created);
+    const idle = formatDuration(now - d.lastActivity);
+    const createdStr = new Date(d.created * 1000).toLocaleString();
+    const mem = formatMem(d.totalMemory);
+
+    let html = `<div class="info-stats">
+      <div class="info-stat"><div class="info-stat-label">Uptime</div><div class="info-stat-value accent">${uptime}</div></div>
+      <div class="info-stat"><div class="info-stat-label">Last Active</div><div class="info-stat-value">${idle} ago</div></div>
+      <div class="info-stat"><div class="info-stat-label">Memory</div><div class="info-stat-value blue">${mem}</div></div>
+      <div class="info-stat"><div class="info-stat-label">CPU</div><div class="info-stat-value orange">${d.totalCpu.toFixed(1)}%</div></div>
+      <div class="info-stat"><div class="info-stat-label">Processes</div><div class="info-stat-value">${d.processCount}</div></div>
+      <div class="info-stat"><div class="info-stat-label">Windows</div><div class="info-stat-value">${d.windows}</div></div>
+      <div class="info-stat"><div class="info-stat-label">Clients</div><div class="info-stat-value">${d.attached}</div></div>
+      <div class="info-stat"><div class="info-stat-label">Created</div><div class="info-stat-value" style="font-size:11px">${createdStr}</div></div>
+    </div>`;
+
+    // Process table
+    html += '<div class="info-section-title">Processes</div>';
+    html += '<table class="info-procs"><thead><tr><th>PID</th><th>Command</th><th>Mem</th><th>CPU</th><th>CWD</th></tr></thead><tbody>';
+    for (const pane of d.panes) {
+      for (const proc of pane.processes) {
+        const cwdShort = pane.cwd.replace(/^\/home\/[^/]+/, '~');
+        html += `<tr>
+          <td>${proc.pid}</td>
+          <td class="proc-cmd">${esc(proc.command)}</td>
+          <td class="proc-mem">${formatMem(proc.rss)}</td>
+          <td>${proc.cpu.toFixed(1)}%</td>
+          <td>${esc(cwdShort)}</td>
+        </tr>`;
+      }
+    }
+    html += '</tbody></table>';
+
+    // Pane details
+    if (d.panes.length > 0) {
+      html += '<div class="info-section-title">Panes</div>';
+      html += '<div class="info-stats">';
+      for (const pane of d.panes) {
+        html += `<div class="info-stat">
+          <div class="info-stat-label">Win ${pane.window} / Pane ${pane.index}</div>
+          <div class="info-stat-value" style="font-size:12px">${pane.width}x${pane.height}</div>
+        </div>`;
+      }
+      html += '</div>';
+    }
+
+    // Recent output
+    if (d.recentOutput.length > 0) {
+      html += '<div class="info-section-title" style="margin-top:16px">Recent Output</div>';
+      html += `<div class="info-output">${esc(d.recentOutput.join('\n').trimEnd())}</div>`;
+    }
+
+    document.getElementById('info-body').innerHTML = html;
+  }
+
+  function formatDuration(seconds) {
+    if (seconds < 0) seconds = 0;
+    const d = Math.floor(seconds / 86400);
+    const h = Math.floor((seconds % 86400) / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    if (d > 0) return `${d}d ${h}h ${m}m`;
+    if (h > 0) return `${h}h ${m}m ${s}s`;
+    if (m > 0) return `${m}m ${s}s`;
+    return `${s}s`;
+  }
+
+  function formatMem(kb) {
+    if (kb >= 1048576) return (kb / 1048576).toFixed(1) + ' GB';
+    if (kb >= 1024) return (kb / 1024).toFixed(1) + ' MB';
+    return kb + ' kB';
   }
 
   // HTML escape (including single quotes for attribute safety)

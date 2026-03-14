@@ -11,6 +11,10 @@ const TerminalView = (() => {
   let ws = null;
   let currentSession = null;
   let heartbeatInterval = null;
+  let inScrollMode = false;
+  let scrollInterval = null;
+  let scrollStartTimer = null;
+  let scrollSafetyTimer = null;
 
   function optimalFontSize() {
     const w = window.innerWidth;
@@ -126,6 +130,80 @@ const TerminalView = (() => {
       if (currentSession) connect(currentSession);
     });
 
+    // Kill button in terminal toolbar — uses the shared modal from dashboard
+    document.getElementById('terminal-kill-btn').addEventListener('click', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!currentSession) return;
+      const name = currentSession;
+      const confirmed = await App.showModal(`Kill session "${name}"? This will terminate all processes in it.`, 'Kill');
+      if (!confirmed) return;
+      try {
+        await fetch(`/api/sessions/${encodeURIComponent(name)}`, { method: 'DELETE' });
+        App.navigate('dashboard');
+      } catch { /* handled by disconnect */ }
+    });
+
+    // AI title generation — magic sparkle button
+    const aiTitleBtn = document.getElementById('ai-title-btn');
+    aiTitleBtn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!currentSession || aiTitleBtn.classList.contains('loading')) return;
+      aiTitleBtn.classList.add('loading');
+      try {
+        const res = await fetch(`/api/sessions/${encodeURIComponent(currentSession)}/generate-title`, { method: 'POST' });
+        const data = await res.json();
+        if (data.title) {
+          const nameLabel = document.getElementById('terminal-session-name');
+          nameLabel.textContent = data.title;
+          currentSession = data.title;
+          window.location.hash = `#terminal/${encodeURIComponent(data.title)}`;
+        }
+      } catch { /* ignore */ }
+      aiTitleBtn.classList.remove('loading');
+    });
+
+    // Editable session name — click label to edit
+    const nameLabel = document.getElementById('terminal-session-name');
+    const nameInput = document.getElementById('terminal-session-name-edit');
+
+    nameLabel.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!currentSession) return;
+      nameInput.value = nameLabel.textContent;
+      nameLabel.classList.add('hidden');
+      nameInput.classList.remove('hidden');
+      nameInput.focus();
+      nameInput.select();
+    });
+
+    async function commitRename() {
+      nameInput.classList.add('hidden');
+      nameLabel.classList.remove('hidden');
+      let newName = nameInput.value.trim().replace(/\s+/g, '-');
+      if (!newName || newName === currentSession) return;
+      try {
+        const res = await fetch(`/api/sessions/${encodeURIComponent(currentSession)}/rename`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ newName }),
+        });
+        if (res.ok) {
+          currentSession = newName;
+          nameLabel.textContent = newName;
+          window.location.hash = `#terminal/${encodeURIComponent(newName)}`;
+        }
+      } catch { /* ignore */ }
+    }
+
+    nameInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); commitRename(); }
+      if (e.key === 'Escape') { e.preventDefault(); nameInput.classList.add('hidden'); nameLabel.classList.remove('hidden'); }
+    });
+    nameInput.addEventListener('blur', commitRename);
+
     // Click terminal container to focus
     document.getElementById('terminal-container').addEventListener('click', () => {
       if (term) term.focus();
@@ -146,7 +224,139 @@ const TerminalView = (() => {
       if (seq && term) term.input(seq, true);
     }, { passive: false });
 
+    // Text select overlay — grab terminal text for native mobile selection
+    document.getElementById('qk-select').addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      openTextSelect();
+    }, { passive: false });
+    document.getElementById('qk-select').addEventListener('click', (e) => {
+      e.preventDefault();
+      openTextSelect();
+    });
+
+    document.getElementById('text-select-close').addEventListener('click', closeTextSelect);
+    document.getElementById('text-select-copy').addEventListener('click', () => {
+      const content = document.getElementById('text-select-content').textContent;
+      navigator.clipboard.writeText(content).then(() => {
+        const btn = document.getElementById('text-select-copy');
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.textContent = 'Copy All'; }, 1500);
+      });
+    });
+
+    // Keyboard-aware viewport: shift UI above the soft keyboard on mobile
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', adjustForKeyboard);
+    }
+
+    // Scroll controls — enter tmux copy-mode and scroll with press-and-hold
+    const scrollUp = document.getElementById('scroll-up');
+    const scrollDown = document.getElementById('scroll-down');
+
+    function bindScrollBtn(btn, direction) {
+      const start = (e) => { e.preventDefault(); startScrolling(direction); };
+      const stop = (e) => { e.preventDefault(); stopScrolling(); };
+      btn.addEventListener('touchstart', start, { passive: false });
+      btn.addEventListener('touchend', stop, { passive: false });
+      btn.addEventListener('touchcancel', stop, { passive: false });
+      btn.addEventListener('mousedown', start);
+      btn.addEventListener('mouseup', stop);
+      btn.addEventListener('mouseleave', stop);
+    }
+
+    bindScrollBtn(scrollUp, 'up');
+    bindScrollBtn(scrollDown, 'down');
+
+    // Reset scroll mode when quickbar keys are pressed (Esc, Ctrl+C exit tmux copy-mode)
+    document.getElementById('terminal-quickbar').addEventListener('touchstart', () => {
+      if (inScrollMode) {
+        stopScrolling();
+        // Send 'q' to exit tmux copy-mode, then reset state
+        if (ws && ws.readyState === WebSocket.OPEN) ws.send('q');
+        exitScrollMode();
+      }
+    });
+
     updateZoomLabel();
+  }
+
+  function enterScrollMode() {
+    if (inScrollMode) return;
+    inScrollMode = true;
+    // Send Ctrl+B [ to enter tmux copy-mode
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send('\x02');
+      setTimeout(() => { if (ws && ws.readyState === WebSocket.OPEN) ws.send('['); }, 30);
+    }
+    document.getElementById('scroll-controls').classList.add('active');
+  }
+
+  function exitScrollMode() {
+    if (!inScrollMode) return;
+    inScrollMode = false;
+    document.getElementById('scroll-controls').classList.remove('active');
+  }
+
+  function startScrolling(direction) {
+    stopScrolling(); // clear any leftover state first
+    if (!term || !ws || ws.readyState !== WebSocket.OPEN) return;
+
+    const needsEnter = !inScrollMode;
+    if (needsEnter) enterScrollMode();
+
+    // Wait for copy-mode to activate before sending scroll keys
+    scrollStartTimer = setTimeout(() => {
+      scrollStartTimer = null;
+      const seq = direction === 'up' ? '\x1b[A' : '\x1b[B';
+      // Send initial burst
+      if (ws && ws.readyState === WebSocket.OPEN) ws.send(seq + seq);
+
+      // Continue scrolling while held — 2 lines every 120ms
+      scrollInterval = setInterval(() => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(seq + seq);
+        } else {
+          stopScrolling();
+        }
+      }, 120);
+    }, needsEnter ? 100 : 0);
+
+    // Hard safety stop — max 1 second of scrolling after any press
+    scrollSafetyTimer = setTimeout(stopScrolling, 1000);
+  }
+
+  function stopScrolling() {
+    if (scrollStartTimer) { clearTimeout(scrollStartTimer); scrollStartTimer = null; }
+    if (scrollInterval) { clearInterval(scrollInterval); scrollInterval = null; }
+    if (scrollSafetyTimer) { clearTimeout(scrollSafetyTimer); scrollSafetyTimer = null; }
+  }
+
+  function openTextSelect() {
+    if (!term) return;
+    const buf = term.buffer.active;
+    let lines = [];
+    for (let i = 0; i < buf.length; i++) {
+      const line = buf.getLine(i);
+      if (line) lines.push(line.translateToString(true));
+    }
+    // Trim trailing empty lines
+    while (lines.length && lines[lines.length - 1].trim() === '') lines.pop();
+    document.getElementById('text-select-content').textContent = lines.join('\n');
+    document.getElementById('text-select-overlay').classList.remove('hidden');
+  }
+
+  function closeTextSelect() {
+    document.getElementById('text-select-overlay').classList.add('hidden');
+    if (term) term.focus();
+  }
+
+  function adjustForKeyboard() {
+    if (window.innerWidth > 768) {
+      document.body.style.height = '';
+      return;
+    }
+    const vv = window.visualViewport;
+    document.body.style.height = `${vv.height}px`;
   }
 
   function handleResize() {
@@ -236,6 +446,8 @@ const TerminalView = (() => {
 
   function disconnect() {
     if (heartbeatInterval) { clearInterval(heartbeatInterval); heartbeatInterval = null; }
+    stopScrolling();
+    exitScrollMode();
     if (ws) {
       ws.onclose = null;
       ws.close();

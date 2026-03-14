@@ -141,6 +141,25 @@ async function createSession(name, command = 'bash', cols = 80, rows = 24, cwd, 
 }
 
 /**
+ * Open a Kitty window attached to an existing tmux session.
+ */
+function openTerminal(name) {
+  try {
+    const kittyProc = spawn('kitty', ['-e', 'tmux', '-u', 'attach-session', '-t', name], {
+      detached: true,
+      stdio: 'ignore',
+      env: { ...process.env, ...LOCALE_ENV },
+    });
+    kittyProc.on('error', (err) => {
+      console.warn(`[session-manager] Kitty launch failed for session ${name}:`, err.message);
+    });
+    kittyProc.unref();
+  } catch (err) {
+    console.warn(`[session-manager] Kitty launch failed for session ${name}:`, err.message);
+  }
+}
+
+/**
  * Kill a tmux session.
  */
 async function killSession(name) {
@@ -190,6 +209,7 @@ module.exports = {
   createSession,
   killSession,
   renameSession,
+  openTerminal,
   getClientCount,
   shutdown,
 };
