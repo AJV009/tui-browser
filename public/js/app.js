@@ -285,7 +285,12 @@ const App = (() => {
     // Initial check on load
     probeLocalIPs();
 
-    // Re-check on network changes, phone wake, tab focus — no polling
+    // Lightweight periodic re-check every 30s — only actually probes if not already on local
+    setInterval(() => {
+      if (!localOrigin) probeLocalIPs();
+    }, 30000);
+
+    // Re-check on network changes, phone wake, tab focus
     window.addEventListener('online', onNetworkChange);
     window.addEventListener('offline', () => { if (localOrigin) switchTo(null, 'tunnel'); });
     if (navigator.connection) {
