@@ -82,40 +82,38 @@
   <div id="status" class="status status-checking">Checking local connection...</div>
 
   <div class="section">
-    <a href="/tui-browser-ca.crt" class="download-btn" download>Download CA Certificate</a>
-    <p>Download this file, then follow the steps for your device below.</p>
-  </div>
-
-  <div class="section">
-    <h2><span class="badge badge-android">Android</span></h2>
+    <h2><span class="badge badge-android">Android (Chrome)</span></h2>
+    <p>Chrome on Android ignores CA certs installed in Settings. Instead, accept the cert directly:</p>
     <div class="step">
       <div class="step-num">Step 1</div>
-      <div class="step-text">Tap the download button above</div>
+      <div class="step-text">Tap this link: <a id="android-link" href="#" target="_blank">open local server</a></div>
+      <div class="step-detail">A "Your connection is not private" warning will appear</div>
     </div>
     <div class="step">
       <div class="step-num">Step 2</div>
-      <div class="step-text">Open Settings > Security > Encryption & credentials</div>
+      <div class="step-text">Tap "Advanced" at the bottom</div>
     </div>
     <div class="step">
       <div class="step-num">Step 3</div>
-      <div class="step-text">Tap "Install a certificate" > "CA certificate"</div>
+      <div class="step-text">Tap "Proceed to [IP address] (unsafe)"</div>
+      <div class="step-detail">This is safe — it's your own server on your local network</div>
     </div>
     <div class="step">
       <div class="step-num">Step 4</div>
-      <div class="step-text">Select the downloaded tui-browser-ca.crt file</div>
-      <div class="step-detail">You may need to confirm with your PIN/fingerprint</div>
+      <div class="step-text">You should see a JSON response — the cert is now accepted</div>
     </div>
     <div class="step">
       <div class="step-num">Step 5</div>
-      <div class="step-text">Done! Go back to the app — it will auto-switch within 15 seconds</div>
+      <div class="step-text">Come back here — the status above will turn green within seconds</div>
     </div>
   </div>
 
   <div class="section">
-    <h2><span class="badge badge-ios">iOS / iPadOS</span></h2>
+    <h2><span class="badge badge-ios">iOS / iPadOS (Safari)</span></h2>
+    <p>Install the CA certificate to the device trust store:</p>
     <div class="step">
       <div class="step-num">Step 1</div>
-      <div class="step-text">Tap the download button above (use Safari)</div>
+      <div class="step-text"><a href="/tui-browser-ca.crt" download>Download CA certificate</a> (open in Safari)</div>
     </div>
     <div class="step">
       <div class="step-num">Step 2</div>
@@ -139,7 +137,7 @@
     <h2><span class="badge badge-desktop">Desktop</span></h2>
     <div class="step">
       <div class="step-num">Option A</div>
-      <div class="step-text">Visit <a id="local-link" href="#">https://localhost:7484</a> and accept the warning</div>
+      <div class="step-text">Visit <a id="local-link" href="#">local server</a> and accept the warning</div>
     </div>
     <div class="step">
       <div class="step-num">Option B</div>
@@ -162,9 +160,12 @@
           return;
         }
 
-        // Update the desktop link
-        document.getElementById('local-link').href = `https://${data.localIPs[0]}:${data.httpsPort}`;
-        document.getElementById('local-link').textContent = `https://${data.localIPs[0]}:${data.httpsPort}`;
+        // Update links with actual local IP
+        const localUrl = `https://${data.localIPs[0]}:${data.httpsPort}`;
+        document.getElementById('local-link').href = localUrl;
+        document.getElementById('local-link').textContent = localUrl;
+        document.getElementById('android-link').href = `${localUrl}/api/version`;
+        document.getElementById('android-link').textContent = `${localUrl}`;
 
         // Try each IP
         for (const ip of data.localIPs) {
