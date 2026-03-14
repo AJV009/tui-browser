@@ -25,9 +25,21 @@ const FULL_VERSION = `${PKG_VERSION.replace(/\.\d+$/, '')}.${BUILD_ID}`; // e.g.
 
 // ---------- AI Title Generation ----------
 
-// Check if claude CLI is available
+// Check if claude CLI is available (check common paths since systemd has minimal PATH)
 let claudeAvailable = false;
-try { execSync('which claude', { stdio: 'ignore' }); claudeAvailable = true; } catch { /* not installed */ }
+let claudePath = null;
+const fs = require('fs');
+const candidatePaths = [
+  process.env.HOME + '/.local/bin/claude',
+  '/usr/local/bin/claude',
+  '/usr/bin/claude',
+];
+for (const p of candidatePaths) {
+  try { if (fs.existsSync(p)) { claudePath = p; claudeAvailable = true; break; } } catch { /* skip */ }
+}
+if (!claudeAvailable) {
+  try { execSync('which claude', { stdio: 'ignore' }); claudePath = 'claude'; claudeAvailable = true; } catch { /* not installed */ }
+}
 
 // Track session title state: sessionName → { manuallyRenamed, lastGenAt }
 const titleState = new Map();
@@ -59,7 +71,7 @@ function extractContext(fullOutput) {
 
 function runClaudeForTitle(context) {
   return new Promise((resolve, reject) => {
-    const proc = spawn('claude', ['-p', '--model', 'haiku', '--no-session-persistence'], {
+    const proc = spawn(claudePath, ['-p', '--model', 'haiku', '--no-session-persistence'], {
       timeout: 30000,
       env: { ...process.env },
     });
