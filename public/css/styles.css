@@ -773,6 +773,8 @@ body {
 }
 
 #terminal-container .xterm { height: 100%; }
+#terminal-container .xterm-viewport { overflow-y: hidden !important; }
+#terminal-container .xterm-viewport::-webkit-scrollbar { display: none; }
 
 /* ========== Terminal Quick-Keys Bar ========== */
 .terminal-quickbar {
