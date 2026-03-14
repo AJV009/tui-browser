@@ -159,6 +159,24 @@ _Date: 2026-03-14_
 - Quick-access from PWA home screen
 - **Why**: When you have many sessions but always care about 2-3
 
+#### 17. Auto-Discovery of Claude Code Remote Sessions
+- Claude Code supports `--remote-control` / `--rc` flag that exposes sessions accessible via claude.ai/code and mobile apps
+- Also supports headless mode (`-p` / `--print`) with session IDs, `--continue`, `--resume`
+- **Idea**: Auto-discover running Claude Code sessions on the host and surface them on the dashboard
+  - Scan for running `claude` processes (similar to how we discover tmux/Kitty)
+  - Detect `--remote-control` sessions and show their session URL / QR code directly in our dashboard
+  - Detect headless (`-p`) sessions and show their session ID + status
+  - Could parse `claude --resume <id>` to list known session IDs
+- **Dashboard integration**: Special "Claude Code" badge on sessions running Claude, similar to Kitty badges
+- **Deep link**: Tap a Claude Code session card → open it in our terminal view (it's already in tmux) OR link out to claude.ai/code
+- **Remote Control bridge**: Show the QR code / session URL from `--rc` right in our UI so you don't need to look at the host terminal
+- **Status indicators**: Show if a Claude session is active (thinking/coding), idle, or waiting for input
+- **Why**: TUI Browser is already built for monitoring Claude Code sessions from your phone. This makes it first-class — you see which sessions have Claude running, their status, and can jump to the remote control URL without needing to be at the host terminal
+- **References**:
+  - [Remote Control docs](https://code.claude.com/docs/en/remote-control)
+  - [Headless mode docs](https://code.claude.com/docs/en/headless)
+  - [Simon Willison's writeup](https://simonwillison.net/2026/Feb/25/claude-code-remote-control/)
+
 ---
 
 ## xterm.js Addons — Full Inventory
