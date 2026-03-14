@@ -254,6 +254,9 @@ const Dashboard = (() => {
       // Cache for instant render on next load
       try { localStorage.setItem('tui_sessions_cache', JSON.stringify({ sessions: lastSessions, unmatchedKitty: lastUnmatchedKitty })); } catch { /* quota */ }
       render(lastSessions, lastUnmatchedKitty);
+
+      // Piggyback: check local path on every successful dashboard poll (no extra cost if already local)
+      if (!App.getLocalOrigin()) App.onNetworkChange();
     } catch {
       // On error, keep existing content — don't wipe the list
       // Only show error if we have nothing at all
