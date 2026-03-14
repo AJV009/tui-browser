@@ -83,6 +83,15 @@ set -as terminal-features 'xterm*:extkeys'
 # UTF-8 support
 set-window-option -q -g utf8 on
 
+# Mouse support
+set -g mouse on
+
+# Hide status bar (tui-browser provides its own UI)
+set -g status off
+
+# Keep windows alive after process exit
+set -g remain-on-exit on
+
 # Clipboard and events
 set -g set-clipboard on
 set -g focus-events on
