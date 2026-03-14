@@ -93,10 +93,17 @@ When your phone/tablet is on the same network as the host PC (WiFi, hotspot), th
 
 **How it works:**
 - The server runs HTTPS on port 7484 alongside HTTP on 7483
-- The client probes local IPs every 15 seconds
-- When a local connection succeeds, the WebSocket switches to the direct path
-- When the local connection is lost (left the network), it falls back to the tunnel
-- A green house icon in the header = local, orange globe = tunnel
+- The client races local IPs against the tunnel on every network event — fastest path wins
+- When a local connection succeeds, the WebSocket switches to the direct path instantly
+- When the local connection is lost, it falls back to the tunnel seamlessly
+- A green house icon in the header = local (LAN), orange globe = tunnel (internet)
+
+**Detection triggers** — the app re-checks the best path on:
+- Dashboard session polling (every 3 seconds, piggybacks on existing calls)
+- Network type changes (WiFi ↔ mobile data)
+- Online/offline transitions
+- Phone wake / tab focus
+- WebSocket disconnection (strongest signal of network change)
 
 **One-time setup per device:**
 
@@ -105,23 +112,23 @@ When your phone/tablet is on the same network as the host PC (WiFi, hotspot), th
    ./scripts/generate-certs.sh
    ```
 
-2. Install the CA certificate on your phone (one-time, enables all future local connections):
+2. Accept the certificate on your device. A guided setup page is available at `/setup-local.html`:
 
-   **Android:**
-   - Open `https://tui.yourdomain.com/tui-browser-ca.crt` on your phone — it downloads the CA cert
-   - Go to **Settings > Security > Encryption & credentials > Install a certificate > CA certificate**
-   - Select the downloaded `tui-browser-ca.crt` file
-   - Confirm the install
+   **Android (Chrome):**
+   - Open the setup page — tap the link to your local server
+   - Tap **Advanced** → **Proceed to [IP] (unsafe)** (this is safe — it's your own server)
+   - Chrome remembers the exception permanently
 
-   **iOS:**
-   - Open `https://tui.yourdomain.com/tui-browser-ca.crt` in Safari
-   - Go to **Settings > General > Profile > TUI Browser** and tap **Install**
-   - Go to **Settings > General > About > Certificate Trust Settings** and enable the TUI Browser CA
+   **iOS (Safari):**
+   - Download the CA cert from the setup page
+   - Go to **Settings > General > VPN & Device Management** → Install the profile
+   - Go to **Settings > General > About > Certificate Trust Settings** → Enable trust
 
-   **Desktop browser:**
-   - Just visit `https://localhost:7484` and accept the warning (or run `sudo mkcert -install` to trust system-wide)
+   **Desktop:**
+   - Visit `https://localhost:7484` and accept the warning
+   - Or run `sudo mkcert -install` to trust system-wide
 
-3. The app will automatically detect the local connection within 15 seconds and switch — green house icon appears in the header
+3. The app will detect the local connection within seconds and switch — green house icon appears
 
 **When does it activate?**
 - Phone connected to same WiFi as the host PC
