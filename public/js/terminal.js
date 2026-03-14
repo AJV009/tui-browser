@@ -17,10 +17,6 @@ const TerminalView = (() => {
   let scrollSafetyTimer = null;
 
   function optimalFontSize() {
-    const w = window.innerWidth;
-    if (w <= 400) return 4;
-    if (w <= 500) return 5;
-    if (w <= 768) return 8;
     return 14;
   }
 
