@@ -149,7 +149,9 @@ const App = (() => {
 
   let localOrigin = null;  // e.g. 'https://192.168.0.131:7484'
   let localProbeInterval = null;
-  let certAccepted = false; // tracks if user has accepted local cert
+  let certAccepted = false;
+  let networkInfo = null; // cached /api/network response
+  let probing = false;
 
   function getWsUrl(sessionName) {
     if (localOrigin) {
@@ -159,63 +161,81 @@ const App = (() => {
     return `${proto}//${window.location.host}/ws/terminal/${encodeURIComponent(sessionName)}`;
   }
 
-  async function probeLocalIPs() {
+  // Quick check if a specific origin is reachable (800ms timeout for speed)
+  async function isReachable(origin, timeoutMs = 800) {
     try {
-      const res = await fetch('/api/network');
-      const data = await res.json();
-      if (!data.localIPs || !data.httpsPort) return;
+      const controller = new AbortController();
+      const t = setTimeout(() => controller.abort(), timeoutMs);
+      const r = await fetch(`${origin}/api/version`, { signal: controller.signal });
+      clearTimeout(t);
+      return r.ok;
+    } catch { return false; }
+  }
 
-      // Also try localhost/127.0.0.1 for same-machine access
-      const ipsToTry = ['127.0.0.1', ...data.localIPs];
-
-      for (const ip of ipsToTry) {
-        const origin = `https://${ip}:${data.httpsPort}`;
-        try {
-          const controller = new AbortController();
-          const timeout = setTimeout(() => controller.abort(), 2000);
-          const r = await fetch(`${origin}/api/version`, { signal: controller.signal });
-          clearTimeout(timeout);
-          if (r.ok) {
-            if (localOrigin !== origin) {
-              localOrigin = origin;
-              certAccepted = true;
-              localStorage.setItem('tui_local_origin', origin);
-              updateConnectionMode('local');
-              showToast('Local network \u2014 fast path active', 'success', 3000);
-              // Reconnect terminal if connected
-              if (currentSession && currentView === 'terminal') {
-                TerminalView.disconnect();
-                TerminalView.connect(currentSession);
-              }
-            }
-            return; // found a working local IP
-          }
-        } catch { /* this IP not reachable or cert not accepted */ }
+  function switchTo(origin, mode) {
+    const changed = localOrigin !== origin;
+    localOrigin = origin;
+    if (origin) {
+      certAccepted = true;
+      localStorage.setItem('tui_local_origin', origin);
+    } else {
+      localStorage.removeItem('tui_local_origin');
+    }
+    updateConnectionMode(mode);
+    if (changed) {
+      showToast(mode === 'local' ? 'Local network \u2014 fast path active' : 'Switched to tunnel', mode === 'local' ? 'success' : 'warning', 3000);
+      if (currentSession && currentView === 'terminal') {
+        TerminalView.disconnect();
+        TerminalView.connect(currentSession);
       }
+    }
+  }
 
-      // No local IP reachable — prompt cert setup if never done
-      if (!certAccepted && data.localIPs.length > 0) {
-        if (!probeLocalIPs._prompted) {
+  async function probeLocalIPs() {
+    if (probing) return;
+    probing = true;
+    try {
+      // Refresh network info periodically (IPs can change)
+      if (!networkInfo) {
+        try {
+          const res = await fetch('/api/network');
+          networkInfo = await res.json();
+        } catch { probing = false; return; }
+      }
+      if (!networkInfo.localIPs || !networkInfo.httpsPort) { probing = false; return; }
+
+      const ipsToTry = ['127.0.0.1', ...networkInfo.localIPs];
+
+      // Race all local IPs — first one to respond wins
+      const raceResult = await Promise.any(
+        ipsToTry.map(async (ip) => {
+          const origin = `https://${ip}:${networkInfo.httpsPort}`;
+          if (await isReachable(origin)) return origin;
+          throw new Error('unreachable');
+        })
+      ).catch(() => null);
+
+      if (raceResult) {
+        switchTo(raceResult, 'local');
+      } else {
+        // No local IP reachable — prompt cert setup if never done
+        if (!certAccepted && networkInfo.localIPs.length > 0 && !probeLocalIPs._prompted) {
           probeLocalIPs._prompted = true;
           const el = document.getElementById('connection-mode');
           if (el) {
             el.innerHTML = `<a href="/setup-local.html" title="Setup local fast-path" style="color:var(--orange);font-family:var(--mono);font-size:9px;text-decoration:underline">setup local</a>`;
           }
         }
+        if (localOrigin) switchTo(null, 'tunnel');
       }
+    } catch { /* ignore */ }
+    probing = false;
+  }
 
-      // No local IP reachable — if we were on local, switch back to tunnel
-      if (localOrigin) {
-        localOrigin = null;
-        localStorage.removeItem('tui_local_origin');
-        updateConnectionMode('tunnel');
-        showToast('Local network lost \u2014 using tunnel', 'warning', 3000);
-        if (currentSession && currentView === 'terminal') {
-          TerminalView.disconnect();
-          TerminalView.connect(currentSession);
-        }
-      }
-    } catch { /* network fetch failed */ }
+  // Instant re-probe on any network change
+  function onNetworkChange() {
+    networkInfo = null; // force refresh IPs
+    probeLocalIPs();
   }
 
   function updateConnectionMode(mode) {
@@ -235,21 +255,35 @@ const App = (() => {
     const cached = localStorage.getItem('tui_local_origin');
     if (cached) {
       localOrigin = cached;
-      // Verify it still works
-      fetch(`${cached}/api/version`).then(r => {
-        if (!r.ok) throw new Error();
-        certAccepted = true;
-      }).catch(() => {
-        localOrigin = null;
-        localStorage.removeItem('tui_local_origin');
+      isReachable(cached).then(ok => {
+        if (ok) {
+          certAccepted = true;
+          updateConnectionMode('local');
+        } else {
+          localOrigin = null;
+          localStorage.removeItem('tui_local_origin');
+          updateConnectionMode('tunnel');
+        }
       });
     }
 
     updateConnectionMode(localOrigin ? 'local' : 'tunnel');
 
-    // Probe every 15 seconds
+    // Initial probe
     probeLocalIPs();
+
+    // Periodic probe every 15 seconds
     localProbeInterval = setInterval(probeLocalIPs, 15000);
+
+    // Instant re-probe on network changes
+    window.addEventListener('online', onNetworkChange);
+    if (navigator.connection) {
+      navigator.connection.addEventListener('change', onNetworkChange);
+    }
+    // Also re-probe on visibility change (phone wake / tab focus)
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') onNetworkChange();
+    });
   }
 
   // ---------- Init ----------
