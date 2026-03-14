@@ -30,7 +30,7 @@
   <path d="M434,170 L256,272 L256,444 L434,342 Z" fill="url(#cubeRight)" stroke="#00e5a0" stroke-width="2.5" stroke-linejoin="round" stroke-opacity="0.3"/>
 
   <!-- ═══ TOP FACE: Ethernet jack recessed into surface ═══ -->
-  <g transform="matrix(0.92, 0.53, -0.92, 0.53, 256, 126)">
+  <g transform="matrix(0.92, 0.53, -0.92, 0.53, 256, 178)">
     <!-- Outer rim (surface level) -->
     <rect x="-50" y="-34" width="100" height="68" rx="8" fill="none" stroke="#00e5a0" stroke-width="3" stroke-opacity="0.6"/>
     <!-- Recessed hole — darker than cube surface -->
@@ -58,7 +58,7 @@
   </g>
 
   <!-- ═══ RIGHT FACE: Matrix rain flush ═══ -->
-  <g transform="translate(350, 330) skewY(-30)" font-family="monospace" font-weight="700" font-size="24" fill="#00e5a0">
+  <g transform="translate(342, 350) skewY(-30)" font-family="monospace" font-weight="700" font-size="24" fill="#00e5a0">
     <!-- Col 1 -->
     <text x="-44" y="-56" opacity="0.9">1</text>
     <text x="-44" y="-28" opacity="0.55">0</text>
