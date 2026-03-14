@@ -62,18 +62,18 @@
   <div id="terminal-view" class="hidden">
     <div class="terminal-toolbar">
       <span class="session-label" id="terminal-session-name" title="Click to rename"></span>
-      <button id="ai-title-btn" class="ai-title-btn hidden" title="AI-generate title"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.5l1.2 3.3 3.3 1.2-3.3 1.2L8 10.5 6.8 7.2 3.5 6 6.8 4.8z"/><path d="M3 12l.6 1.4L5 14l-1.4.6L3 16l-.6-1.4L1 14l1.4-.6z"/><path d="M12 10l.5 1 1 .5-1 .5-.5 1-.5-1-1-.5 1-.5z"/></svg></button>
+      <button id="ai-title-btn" class="ai-title-btn" title="AI-generate title"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.5l1.2 3.3 3.3 1.2-3.3 1.2L8 10.5 6.8 7.2 3.5 6 6.8 4.8z"/><path d="M3 12l.6 1.4L5 14l-1.4.6L3 16l-.6-1.4L1 14l1.4-.6z"/><path d="M12 10l.5 1 1 .5-1 .5-.5 1-.5-1-1-.5 1-.5z"/></svg></button>
       <input class="session-label-edit hidden" id="terminal-session-name-edit" type="text" autocomplete="off" spellcheck="false">
-      <div class="zoom-controls">
-        <button id="zoom-out-btn" class="zoom-btn" title="Zoom out">-</button>
-        <span id="zoom-level">14</span>
-        <button id="zoom-in-btn" class="zoom-btn" title="Zoom in">+</button>
-      </div>
       <div class="connection-status">
         <button id="reconnect-btn" class="reconnect-btn" style="display:none" title="Reconnect">&#x21bb;</button>
         <span class="status-dot" id="terminal-status-dot"></span>
         <span id="terminal-status-text">Disconnected</span>
         <button id="terminal-kill-btn" class="terminal-kill-btn" title="Kill session">&#x2715;</button>
+      </div>
+      <div class="zoom-controls">
+        <button id="zoom-out-btn" class="zoom-btn" title="Zoom out">-</button>
+        <span id="zoom-level">14</span>
+        <button id="zoom-in-btn" class="zoom-btn" title="Zoom in">+</button>
       </div>
     </div>
     <div id="terminal-container"></div>

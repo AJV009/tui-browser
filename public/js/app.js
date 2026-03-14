@@ -91,9 +91,6 @@ const App = (() => {
         const el = document.getElementById('updated-label');
         if (el) el.textContent = `last updated: ${formatTimestamp(d.startedAt)}`;
       }
-      // Show AI title button if claude is available
-      const aiBtn = document.getElementById('ai-title-btn');
-      if (aiBtn && d.claudeAvailable) aiBtn.classList.remove('hidden');
     }).catch(() => {});
 
     setInterval(() => {
