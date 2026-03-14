@@ -80,7 +80,7 @@ function runClaudeForTitle(context) {
     proc.on('error', reject);
     proc.on('close', (code) => {
       if (code !== 0) return reject(new Error('claude exited with code ' + code));
-      const title = stdout.trim().replace(/^["']|["']$/g, '').slice(0, 40);
+      const title = stdout.trim().replace(/^["']|["']$/g, '').replace(/\s+/g, '-').replace(/[.:]/g, '-').slice(0, 40);
       resolve(title);
     });
     proc.stdin.write(`Analyze this terminal output and generate a concise session title.
