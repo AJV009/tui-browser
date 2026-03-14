@@ -7,7 +7,7 @@
  */
 
 const pty = require('node-pty');
-const { execFile } = require('child_process');
+const { execFile, spawn } = require('child_process');
 
 function exec(cmd, args) {
   return new Promise((resolve, reject) => {
@@ -114,12 +114,30 @@ function detachClient(sessionName, ws) {
 /**
  * Create a new tmux session.
  */
-async function createSession(name, command = 'bash', cols = 80, rows = 24) {
+async function createSession(name, command = 'bash', cols = 80, rows = 24, cwd) {
   const args = ['new-session', '-d', '-s', name, '-x', String(cols), '-y', String(rows)];
+  if (cwd) {
+    args.push('-c', cwd);
+  }
   if (command && command !== 'bash') {
     args.push(command);
   }
   await exec('tmux', args);
+
+  // Best-effort: open a Kitty window attached to this session
+  try {
+    const kittyProc = spawn('kitty', ['-e', 'tmux', 'attach-session', '-t', name], {
+      detached: true,
+      stdio: 'ignore',
+    });
+    kittyProc.on('error', (err) => {
+      console.warn(`[session-manager] Kitty launch failed for session ${name}:`, err.message);
+    });
+    kittyProc.unref();
+  } catch (err) {
+    console.warn(`[session-manager] Kitty launch failed for session ${name}:`, err.message);
+  }
+
   return { name, command };
 }
 
@@ -160,6 +178,29 @@ function getClientCount(sessionName) {
   return entry ? entry.clients.size : 0;
 }
 
+/**
+ * Graceful shutdown — close all PTY attachments and notify clients.
+ * Does NOT kill tmux sessions (they survive server restarts by design).
+ */
+function shutdown() {
+  for (const [sessionName, entry] of activeSessions) {
+    for (const client of entry.clients) {
+      try {
+        client.send(JSON.stringify({ type: 'session-ended', sessionName }));
+        client.close();
+      } catch {
+        // ignore
+      }
+    }
+    try {
+      entry.proc.kill();
+    } catch {
+      // ignore
+    }
+  }
+  activeSessions.clear();
+}
+
 module.exports = {
   attachClient,
   writeInput,
@@ -169,4 +210,5 @@ module.exports = {
   killSession,
   renameSession,
   getClientCount,
+  shutdown,
 };

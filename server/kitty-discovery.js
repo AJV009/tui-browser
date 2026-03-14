@@ -104,11 +104,11 @@ async function discoverKittyWindows() {
 
   const osWindows = await listKittyWindows(socket);
 
+  // Flatten all windows — no preview fetching (tmux handles previews)
   const windows = [];
   for (const osWin of osWindows) {
     for (const tab of osWin.tabs || []) {
       for (const win of tab.windows || []) {
-        const preview = await getWindowText(socket, win.id);
         windows.push({
           id: win.id,
           title: win.title || `Window ${win.id}`,
@@ -121,7 +121,6 @@ async function discoverKittyWindows() {
           tabTitle: tab.title || `Tab ${tab.id}`,
           columns: win.columns,
           lines: win.lines,
-          preview: (preview || '').slice(-500), // last 500 chars
           source: 'kitty',
         });
       }

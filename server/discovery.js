@@ -51,6 +51,8 @@ const PANE_FORMAT = [
   '#{pane_active}',
 ].join(SEP);
 
+const CLIENT_FORMAT = ['#{client_pid}', '#{session_name}'].join(SEP);
+
 async function listSessions() {
   let raw;
   try {
@@ -61,19 +63,20 @@ async function listSessions() {
 
   if (!raw) return [];
 
-  const sessions = [];
-  for (const line of raw.split('\n')) {
+  const parsed = raw.split('\n').map((line) => {
     const [id, name, windows, attached, created] = line.split(SEP);
-    sessions.push({
+    return {
       id,
       name,
       windows: parseInt(windows, 10),
-      attached: parseInt(attached, 10) > 0,
+      attached: parseInt(attached, 10),
       created: parseInt(created, 10) * 1000, // ms epoch
-      panes: await listPanes(name),
-    });
-  }
-  return sessions;
+    };
+  });
+
+  const paneResults = await Promise.all(parsed.map((s) => listPanes(s.name)));
+
+  return parsed.map((s, i) => ({ ...s, panes: paneResults[i] }));
 }
 
 async function listPanes(sessionName) {
@@ -116,21 +119,64 @@ async function getSessionDetail(sessionName) {
   return session;
 }
 
+async function listTmuxClients() {
+  let raw;
+  try {
+    raw = await exec('tmux', ['list-clients', '-F', CLIENT_FORMAT]);
+  } catch {
+    return [];
+  }
+
+  if (!raw) return [];
+
+  return raw.split('\n').map((line) => {
+    const [pid, sessionName] = line.split(SEP);
+    return { pid: parseInt(pid, 10), sessionName };
+  });
+}
+
 /**
  * Unified discovery — returns tmux sessions + kitty windows in one call.
  */
 async function discoverAll() {
   const kittyDiscovery = require('./kitty-discovery');
 
-  const [tmuxSessions, kittyResult] = await Promise.all([
+  const [tmuxSessions, tmuxClients, kittyResult] = await Promise.all([
     listSessions(),
+    listTmuxClients(),
     kittyDiscovery.discoverKittyWindows(),
   ]);
 
-  return {
-    tmux: tmuxSessions,
-    kitty: kittyResult,
-  };
+  // Map: client PID → session name (for Kitty matching)
+  const pidToSession = new Map();
+  for (const client of tmuxClients) {
+    pidToSession.set(client.pid, client.sessionName);
+  }
+
+  // Match Kitty windows to tmux sessions via PID
+  const kittyWindows = kittyResult.available ? kittyResult.windows || [] : [];
+  const matchedKittyBySession = new Map(); // sessionName → [kittyWindow, ...]
+  const unmatchedKitty = [];
+
+  for (const win of kittyWindows) {
+    const sessionName = pidToSession.get(win.pid);
+    if (sessionName) {
+      if (!matchedKittyBySession.has(sessionName)) {
+        matchedKittyBySession.set(sessionName, []);
+      }
+      matchedKittyBySession.get(sessionName).push(win);
+    } else {
+      unmatchedKitty.push(win);
+    }
+  }
+
+  // Build unified session objects
+  const sessions = tmuxSessions.map((s) => ({
+    ...s,
+    kittyWindows: matchedKittyBySession.get(s.name) || [],
+  }));
+
+  return { sessions, unmatchedKitty };
 }
 
 module.exports = {
@@ -140,5 +186,6 @@ module.exports = {
   listPanes,
   capturePane,
   getSessionDetail,
+  listTmuxClients,
   discoverAll,
 };
