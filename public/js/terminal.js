@@ -90,10 +90,10 @@ const TerminalView = (() => {
       // software renderer is fine
     }
 
-    // Forward keystrokes to WebSocket
+    // Forward keystrokes to WebSocket — raw, no JSON wrapping
     term.onData((data) => {
       if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'input', data }));
+        ws.send(data);
       }
     });
 
@@ -192,15 +192,16 @@ const TerminalView = (() => {
 
     ws.onmessage = (ev) => {
       if (typeof ev.data === 'string') {
-        try {
-          const json = JSON.parse(ev.data);
-          if (json.type === 'session-ended') {
-            setStatus('error', 'Session ended');
-            term.writeln('\r\n\x1b[1;31m[Session ended]\x1b[0m');
-            return;
-          }
-        } catch {
-          // Not JSON — terminal output
+        // Only attempt JSON parse if it looks like a control message
+        if (ev.data.charCodeAt(0) === 123 /* '{' */) {
+          try {
+            const json = JSON.parse(ev.data);
+            if (json.type === 'session-ended') {
+              setStatus('error', 'Session ended');
+              term.writeln('\r\n\x1b[1;31m[Session ended]\x1b[0m');
+              return;
+            }
+          } catch { /* not JSON after all */ }
         }
         term.write(ev.data);
       } else {

@@ -3,6 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#000000">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="TUI">
+  <link rel="manifest" href="/manifest.json" crossorigin="use-credentials">
+  <link rel="icon" href="/icons/icon-192.png" type="image/png">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
   <title>TUI Browser</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css">
   <link rel="stylesheet" href="/css/styles.css">
@@ -12,7 +19,10 @@
   <!-- Header -->
   <div id="header">
     <a href="/#dashboard" style="text-decoration:none"><h1 id="header-title">TUI Browser</h1></a>
-    <button id="back-btn" class="nav-btn" style="display:none">Dashboard</button>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button id="install-btn" class="nav-btn" style="display:none">Install App</button>
+      <button id="back-btn" class="nav-btn" style="display:none">Dashboard</button>
+    </div>
   </div>
 
   <!-- Dashboard View -->
@@ -66,5 +76,36 @@
   <script src="/js/dashboard.js"></script>
   <script src="/js/terminal.js"></script>
   <script src="/js/app.js"></script>
+  <script>
+    // PWA install prompt
+    let deferredPrompt = null;
+    const installBtn = document.getElementById('install-btn');
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      installBtn.style.display = 'inline-flex';
+    });
+    installBtn.addEventListener('click', () => {
+      if (!deferredPrompt) return;
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then(() => {
+        deferredPrompt = null;
+        installBtn.style.display = 'none';
+      });
+    });
+    window.addEventListener('appinstalled', () => {
+      installBtn.style.display = 'none';
+      deferredPrompt = null;
+    });
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      installBtn.style.display = 'none';
+    }
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').then((reg) => {
+        setInterval(() => reg.update(), 60000);
+      });
+    }
+  </script>
 </body>
 </html>

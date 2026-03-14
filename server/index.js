@@ -19,11 +19,15 @@ const PORT = parseInt(process.env.PORT || process.argv[2], 10) || 3000;
 
 const app = express();
 app.use(express.json());
-app.use(express.static(path.join(__dirname, '..', 'public'), {
-  setHeaders: (res) => {
+app.use((req, res, next) => {
+  // HTML, SW, and manifest must never be cached by Cloudflare
+  const p = req.path;
+  if (p === '/' || p.endsWith('.html') || p.endsWith('sw.js') || p.endsWith('manifest.json')) {
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-  },
-}));
+  }
+  next();
+});
+app.use(express.static(path.join(__dirname, '..', 'public')));
 
 // ---------- Helpers ----------
 
@@ -131,6 +135,13 @@ wss.on('connection', (ws, sessionName) => {
   ws.on('message', (msg) => {
     const str = msg.toString();
 
+    // Fast path: raw terminal input (most messages — no JSON overhead)
+    if (attached && str.charCodeAt(0) !== 123 /* '{' */) {
+      sessions.writeInput(sessionName, str);
+      return;
+    }
+
+    // Slow path: JSON control messages (attach, resize, ping)
     try {
       const json = JSON.parse(str);
 
@@ -153,6 +164,8 @@ wss.on('connection', (ws, sessionName) => {
         return;
       }
 
+      if (json.type === 'ping') return;
+
       if (json.type === 'input' && json.data != null) {
         if (attached) {
           sessions.writeInput(sessionName, json.data);
@@ -160,11 +173,10 @@ wss.on('connection', (ws, sessionName) => {
         return;
       }
     } catch {
-      // Not JSON — treat as raw terminal input (for simpler clients)
-    }
-
-    if (attached) {
-      sessions.writeInput(sessionName, str);
+      // Malformed JSON — treat as raw input
+      if (attached) {
+        sessions.writeInput(sessionName, str);
+      }
     }
   });
 

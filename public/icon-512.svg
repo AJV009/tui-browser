@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="cubeTop" x1="0" y1="1" x2="0.5" y2="0">
+      <stop offset="0%" stop-color="#141414"/>
+      <stop offset="100%" stop-color="#1c1c1c"/>
+    </linearGradient>
+    <linearGradient id="cubeLeft" x1="1" y1="0" x2="0" y2="0.5">
+      <stop offset="0%" stop-color="#101010"/>
+      <stop offset="100%" stop-color="#080808"/>
+    </linearGradient>
+    <linearGradient id="cubeRight" x1="0" y1="0" x2="1" y2="0.5">
+      <stop offset="0%" stop-color="#0d0d0d"/>
+      <stop offset="100%" stop-color="#050505"/>
+    </linearGradient>
+    <linearGradient id="jackDepth" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#00e5a0" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#000" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" rx="112" fill="#000"/>
+
+  <!-- 3D Cube -->
+  <!-- Top face -->
+  <path d="M256,68 L434,170 L256,272 L78,170 Z" fill="url(#cubeTop)" stroke="#00e5a0" stroke-width="2.5" stroke-linejoin="round" stroke-opacity="0.45"/>
+  <!-- Left face -->
+  <path d="M78,170 L256,272 L256,444 L78,342 Z" fill="url(#cubeLeft)" stroke="#00e5a0" stroke-width="2.5" stroke-linejoin="round" stroke-opacity="0.3"/>
+  <!-- Right face -->
+  <path d="M434,170 L256,272 L256,444 L434,342 Z" fill="url(#cubeRight)" stroke="#00e5a0" stroke-width="2.5" stroke-linejoin="round" stroke-opacity="0.3"/>
+
+  <!-- ═══ TOP FACE: Ethernet jack recessed into surface ═══ -->
+  <g transform="matrix(0.92, 0.53, -0.92, 0.53, 256, 126)">
+    <!-- Outer rim (surface level) -->
+    <rect x="-50" y="-34" width="100" height="68" rx="8" fill="none" stroke="#00e5a0" stroke-width="3" stroke-opacity="0.6"/>
+    <!-- Recessed hole — darker than cube surface -->
+    <rect x="-44" y="-28" width="88" height="56" rx="6" fill="#020202"/>
+    <!-- Inner depth glow -->
+    <rect x="-44" y="-28" width="88" height="56" rx="6" fill="url(#jackDepth)"/>
+    <!-- 6 Contact pins -->
+    <line x1="-30" y1="-16" x2="-30" y2="16" stroke="#00e5a0" stroke-width="4" stroke-linecap="round" opacity="0.9"/>
+    <line x1="-14" y1="-16" x2="-14" y2="16" stroke="#00e5a0" stroke-width="4" stroke-linecap="round" opacity="0.9"/>
+    <line x1="2" y1="-16" x2="2" y2="16" stroke="#00e5a0" stroke-width="4" stroke-linecap="round" opacity="0.9"/>
+    <line x1="18" y1="-16" x2="18" y2="16" stroke="#00e5a0" stroke-width="4" stroke-linecap="round" opacity="0.9"/>
+    <line x1="34" y1="-16" x2="34" y2="16" stroke="#00e5a0" stroke-width="4" stroke-linecap="round" opacity="0.9"/>
+    <!-- Clip notch at top -->
+    <path d="M-22,-34 L-22,-46 L30,-46 L30,-34" fill="none" stroke="#00e5a0" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.45"/>
+  </g>
+
+  <!-- ═══ LEFT FACE: </> centered on face ═══ -->
+  <g transform="translate(166, 330) skewY(30)">
+    <!-- < -->
+    <path d="M-36,-36 L-60,-10 L-36,16" fill="none" stroke="#00e5a0" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- / -->
+    <line x1="-16" y1="-44" x2="0" y2="24" stroke="#00e5a0" stroke-width="9" stroke-linecap="round" opacity="0.35"/>
+    <!-- > -->
+    <path d="M20,-36 L44,-10 L20,16" fill="none" stroke="#00e5a0" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <!-- ═══ RIGHT FACE: Matrix rain flush ═══ -->
+  <g transform="translate(350, 330) skewY(-30)" font-family="monospace" font-weight="700" font-size="24" fill="#00e5a0">
+    <!-- Col 1 -->
+    <text x="-44" y="-56" opacity="0.9">1</text>
+    <text x="-44" y="-28" opacity="0.55">0</text>
+    <text x="-44" y="0" opacity="0.3">1</text>
+    <text x="-44" y="28" opacity="0.12">0</text>
+
+    <!-- Col 2 -->
+    <text x="-14" y="-68" opacity="0.4">0</text>
+    <text x="-14" y="-40" opacity="0.85">1</text>
+    <text x="-14" y="-12" opacity="0.6">0</text>
+    <text x="-14" y="16" opacity="0.25">1</text>
+    <text x="-14" y="44" opacity="0.08">0</text>
+
+    <!-- Col 3 -->
+    <text x="16" y="-50" opacity="0.7">1</text>
+    <text x="16" y="-22" opacity="0.4">0</text>
+    <text x="16" y="6" opacity="0.9">1</text>
+    <text x="16" y="34" opacity="0.15">0</text>
+
+    <!-- Col 4 -->
+    <text x="46" y="-62" opacity="0.5">0</text>
+    <text x="46" y="-34" opacity="0.8">1</text>
+    <text x="46" y="-6" opacity="0.3">0</text>
+
+    <!-- Col 5 -->
+    <text x="72" y="-44" opacity="0.6">1</text>
+    <text x="72" y="-16" opacity="0.35">0</text>
+  </g>
+</svg>
