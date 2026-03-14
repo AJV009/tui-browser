@@ -826,17 +826,25 @@ body {
   right: 6px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
   z-index: 15;
-  transition: opacity 0.2s;
 }
 
-.scroll-ctrl-btn {
-  width: 32px;
-  height: 32px;
+.scroll-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   border: 1px solid var(--border-hover);
   border-radius: 6px;
   background: var(--surface-hover);
+  overflow: hidden;
+}
+
+.scroll-pill-btn {
+  width: 32px;
+  height: 24px;
+  border: none;
+  background: transparent;
   color: var(--text);
   font-size: 14px;
   font-weight: 700;
@@ -847,18 +855,31 @@ body {
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
   user-select: none;
-  transition: all 0.15s;
+  transition: background 0.1s;
 }
 
-.scroll-controls.active .scroll-ctrl-btn {
+.scroll-pill-btn:active {
   background: var(--accent-dim);
+  color: var(--accent);
+}
+
+.scroll-controls.active .scroll-pill {
   border-color: #00e5a066;
+}
+
+.scroll-controls.active .scroll-pill-btn {
   color: var(--accent);
 }
 
-.scroll-ctrl-btn:active {
-  background: var(--accent-dim);
-  color: var(--accent);
+.scroll-pill-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 0;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  width: 100%;
 }
 
 /* ========== Text Select Overlay ========== */
