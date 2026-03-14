@@ -7,21 +7,70 @@
 const TerminalView = (() => {
   let term = null;
   let fitAddon = null;
+  let webglAddon = null;
   let ws = null;
   let currentSession = null;
+  let heartbeatInterval = null;
+
+  function optimalFontSize() {
+    const w = window.innerWidth;
+    if (w <= 400) return 4;
+    if (w <= 500) return 5;
+    if (w <= 768) return 8;
+    return 14;
+  }
+
+  function updateZoomLabel() {
+    const el = document.getElementById('zoom-level');
+    if (el && term) el.textContent = term.options.fontSize;
+  }
+
+  function reloadWebGL() {
+    if (webglAddon) {
+      try { webglAddon.dispose(); } catch { /* ignore */ }
+      webglAddon = null;
+    }
+    try {
+      webglAddon = new WebglAddon.WebglAddon();
+      webglAddon.onContextLoss(() => { webglAddon.dispose(); webglAddon = null; });
+      term.loadAddon(webglAddon);
+    } catch { /* software renderer fallback */ }
+  }
+
+  function setFontSize(size) {
+    if (!term) return;
+    size = Math.max(2, Math.min(32, size));
+    term.options.fontSize = size;
+    updateZoomLabel();
+    // WebGL addon caches font textures — must reload to pick up new size
+    reloadWebGL();
+    if (fitAddon) {
+      setTimeout(() => {
+        fitAddon.fit();
+        sendResize();
+      }, 50);
+    }
+  }
+
+  function sendResize() {
+    if (ws && ws.readyState === WebSocket.OPEN && term) {
+      ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+    }
+  }
 
   function init() {
-    // Terminal is created once and reused
     term = new Terminal({
       cursorBlink: true,
       cursorStyle: 'block',
-      fontSize: 14,
+      fontSize: optimalFontSize(),
       fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Menlo', monospace",
       theme: {
-        background: '#1a1a2e',
-        foreground: '#e0e0e0',
-        cursor: '#e94560',
-        selectionBackground: '#e9456044',
+        background: '#000000',
+        foreground: '#d4d4d4',
+        cursor: '#00e5a0',
+        cursorAccent: '#000000',
+        selectionBackground: '#00e5a033',
+        selectionForeground: '#ffffff',
       },
       allowProposedApi: true,
       scrollback: 5000,
@@ -34,9 +83,9 @@ const TerminalView = (() => {
 
     // Try WebGL, fall back silently
     try {
-      const webgl = new WebglAddon.WebglAddon();
-      webgl.onContextLoss(() => webgl.dispose());
-      term.loadAddon(webgl);
+      webglAddon = new WebglAddon.WebglAddon();
+      webglAddon.onContextLoss(() => { webglAddon.dispose(); webglAddon = null; });
+      term.loadAddon(webglAddon);
     } catch {
       // software renderer is fine
     }
@@ -50,26 +99,51 @@ const TerminalView = (() => {
 
     // Resize handling
     window.addEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', () => {
+      // Delay to let the browser settle the new dimensions
+      setTimeout(handleResize, 200);
+    });
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleResize);
+    }
+
+    // Zoom buttons (prevent event leaking into xterm)
+    document.getElementById('zoom-in-btn').addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setFontSize(term.options.fontSize + 1);
+    });
+    document.getElementById('zoom-out-btn').addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setFontSize(term.options.fontSize - 1);
+    });
+
+    // Reconnect button
+    document.getElementById('reconnect-btn').addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (currentSession) connect(currentSession);
+    });
 
     // Click terminal container to focus
     document.getElementById('terminal-container').addEventListener('click', () => {
       if (term) term.focus();
     });
+
+    updateZoomLabel();
   }
 
   function handleResize() {
-    if (!fitAddon) return;
-    // Only resize if terminal view is visible
+    if (!fitAddon || !term) return;
     if (document.getElementById('terminal-view').classList.contains('hidden')) return;
 
     fitAddon.fit();
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
-    }
+    sendResize();
+    updateZoomLabel();
   }
 
   function connect(sessionName) {
-    // Disconnect from any existing session first
     disconnect();
 
     currentSession = sessionName;
@@ -91,10 +165,21 @@ const TerminalView = (() => {
     ws.onopen = () => {
       setStatus('connected', 'Connected');
 
-      // Fit terminal now that the view is visible
+      // Heartbeat to prevent Cloudflare/proxy idle timeout
+      if (heartbeatInterval) clearInterval(heartbeatInterval);
+      heartbeatInterval = setInterval(() => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'ping' }));
+        }
+      }, 30000);
+
       setTimeout(() => {
+        const newSize = optimalFontSize();
+        if (term.options.fontSize !== newSize) {
+          term.options.fontSize = newSize;
+        }
         fitAddon.fit();
-        // Send attach message with current dimensions
+        updateZoomLabel();
         ws.send(JSON.stringify({
           type: 'attach',
           cols: term.cols,
@@ -107,13 +192,11 @@ const TerminalView = (() => {
 
     ws.onmessage = (ev) => {
       if (typeof ev.data === 'string') {
-        // Check for control messages
         try {
           const json = JSON.parse(ev.data);
           if (json.type === 'session-ended') {
             setStatus('error', 'Session ended');
             term.writeln('\r\n\x1b[1;31m[Session ended]\x1b[0m');
-            setTimeout(() => App.navigate('dashboard'), 1500);
             return;
           }
         } catch {
@@ -126,6 +209,7 @@ const TerminalView = (() => {
     };
 
     ws.onclose = () => {
+      if (heartbeatInterval) { clearInterval(heartbeatInterval); heartbeatInterval = null; }
       setStatus('error', 'Disconnected');
     };
 
@@ -135,6 +219,7 @@ const TerminalView = (() => {
   }
 
   function disconnect() {
+    if (heartbeatInterval) { clearInterval(heartbeatInterval); heartbeatInterval = null; }
     if (ws) {
       ws.onclose = null;
       ws.close();
@@ -147,8 +232,10 @@ const TerminalView = (() => {
   function setStatus(state, text) {
     const dot = document.getElementById('terminal-status-dot');
     const label = document.getElementById('terminal-status-text');
+    const reconnectBtn = document.getElementById('reconnect-btn');
     if (dot) dot.className = 'status-dot ' + (state === 'connected' ? 'attached' : state === 'connecting' ? 'detached' : '');
     if (label) label.textContent = text;
+    if (reconnectBtn) reconnectBtn.style.display = (state === 'error' && currentSession) ? 'flex' : 'none';
   }
 
   return { init, connect, disconnect };

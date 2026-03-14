@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TUI Browser</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css">
   <link rel="stylesheet" href="/css/styles.css">
@@ -11,7 +11,7 @@
 
   <!-- Header -->
   <div id="header">
-    <h1>TUI Browser</h1>
+    <a href="/#dashboard" style="text-decoration:none"><h1 id="header-title">TUI Browser</h1></a>
     <button id="back-btn" class="nav-btn" style="display:none">Dashboard</button>
   </div>
 
@@ -34,12 +34,29 @@
   <div id="terminal-view" class="hidden">
     <div class="terminal-toolbar">
       <span class="session-label" id="terminal-session-name"></span>
+      <div class="zoom-controls">
+        <button id="zoom-out-btn" class="zoom-btn" title="Zoom out">-</button>
+        <span id="zoom-level">14</span>
+        <button id="zoom-in-btn" class="zoom-btn" title="Zoom in">+</button>
+      </div>
       <div class="connection-status">
+        <button id="reconnect-btn" class="reconnect-btn" style="display:none" title="Reconnect">&#9889;</button>
         <span class="status-dot" id="terminal-status-dot"></span>
         <span id="terminal-status-text">Disconnected</span>
       </div>
     </div>
     <div id="terminal-container"></div>
+  </div>
+
+  <!-- Modal -->
+  <div id="modal-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <p id="modal-message"></p>
+      <div class="modal-actions">
+        <button id="modal-cancel" class="btn btn-secondary">Cancel</button>
+        <button id="modal-confirm" class="btn btn-danger">Kill</button>
+      </div>
+    </div>
   </div>
 
   <!-- Scripts -->

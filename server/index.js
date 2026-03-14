@@ -19,7 +19,11 @@ const PORT = parseInt(process.env.PORT || process.argv[2], 10) || 3000;
 
 const app = express();
 app.use(express.json());
-app.use(express.static(path.join(__dirname, '..', 'public')));
+app.use(express.static(path.join(__dirname, '..', 'public'), {
+  setHeaders: (res) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  },
+}));
 
 // ---------- Helpers ----------
 
@@ -179,13 +183,6 @@ wss.on('connection', (ws, sessionName) => {
     console.error('ERROR: tmux is not installed.');
     console.error('Install it with: sudo apt install tmux  (or brew install tmux on macOS)');
     process.exit(1);
-  }
-
-  // Ensure tmux server is running with at least a default session
-  const serverRunning = await discovery.isTmuxServerRunning();
-  if (!serverRunning) {
-    console.log('No tmux server running — creating default session...');
-    await sessions.createSession('default');
   }
 
   server.listen(PORT, () => {

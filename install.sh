@@ -114,6 +114,7 @@ Environment=PATH=$NODE_DIR:/usr/local/bin:/usr/bin:/bin
 Environment=HOME=$HOME
 Environment=LANG=en_IN.UTF-8
 Environment=LC_ALL=en_IN.UTF-8
+Environment=PORT=7483
 ExecStart=$NODE_BIN $SCRIPT_DIR/server/index.js
 Restart=on-failure
 RestartSec=3
@@ -172,7 +173,7 @@ sleep 1
 if systemctl --user is-active --quiet tui-browser.service; then
   info "TUI Browser is running!"
   echo ""
-  echo -e "  ${GREEN}http://localhost:3000${NC}"
+  echo -e "  ${GREEN}http://localhost:7483${NC}"
   echo ""
 else
   err "Service failed to start. Check logs with:"

@@ -59,6 +59,7 @@ const App = (() => {
       navigate('dashboard');
     });
 
+
     // Initialize sub-modules
     Dashboard.init();
     TerminalView.init();
