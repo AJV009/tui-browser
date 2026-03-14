@@ -30,6 +30,7 @@ const SESSION_FORMAT = [
   '#{session_windows}',
   '#{session_attached}',
   '#{session_created}',
+  '#{session_activity}',
 ].join(SEP);
 
 const PANE_FORMAT = [
@@ -55,13 +56,14 @@ async function listSessions() {
   if (!raw) return [];
 
   const parsed = raw.split('\n').map((line) => {
-    const [id, name, windows, attached, created] = line.split(SEP);
+    const [id, name, windows, attached, created, activity] = line.split(SEP);
     return {
       id,
       name,
       windows: parseInt(windows, 10),
       attached: parseInt(attached, 10),
       created: parseInt(created, 10) * 1000, // ms epoch
+      lastActivity: parseInt(activity, 10) * 1000,
     };
   });
 
