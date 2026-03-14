@@ -25,7 +25,7 @@ const TerminalView = (() => {
   }
 
   function updateZoomLabel() {
-    const el = document.getElementById('zoom-level');
+    const el = document.getElementById('zoom-value');
     if (el && term) el.textContent = term.options.fontSize;
   }
 
