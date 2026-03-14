@@ -285,12 +285,8 @@ const App = (() => {
     // Initial check on load
     probeLocalIPs();
 
-    // Lightweight periodic re-check every 30s — only actually probes if not already on local
-    setInterval(() => {
-      if (!localOrigin) probeLocalIPs();
-    }, 30000);
-
     // Re-check on network changes, phone wake, tab focus
+    // (dashboard poll piggybacks local probe every 3s — no separate interval needed)
     window.addEventListener('online', onNetworkChange);
     window.addEventListener('offline', () => { if (localOrigin) switchTo(null, 'tunnel'); });
     if (navigator.connection) {
