@@ -85,6 +85,15 @@ const TerminalView = (() => {
 
     term.open(document.getElementById('terminal-container'));
 
+    // Fix mobile keyboard input — disable autocorrect/autocomplete on xterm's hidden textarea
+    const xtermTextarea = document.querySelector('#terminal-container .xterm-helper-textarea');
+    if (xtermTextarea) {
+      xtermTextarea.setAttribute('autocorrect', 'off');
+      xtermTextarea.setAttribute('autocapitalize', 'off');
+      xtermTextarea.setAttribute('autocomplete', 'off');
+      xtermTextarea.setAttribute('spellcheck', 'false');
+    }
+
     // Try WebGL, fall back silently
     try {
       webglAddon = new WebglAddon.WebglAddon();
@@ -94,10 +103,24 @@ const TerminalView = (() => {
       // software renderer is fine
     }
 
-    // Forward keystrokes to WebSocket — raw, no JSON wrapping
+    // Forward keystrokes to WebSocket — batched to prevent drops over high-latency connections
+    // Instead of sending each character individually, buffer for a short window
+    // and flush as a single message. Paste already comes as one chunk so no change there.
+    let inputBuffer = '';
+    let inputFlushTimer = null;
+    const INPUT_BATCH_MS = 30; // ~33fps — imperceptible delay, big reliability gain on mobile
+
     term.onData((data) => {
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(data);
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      inputBuffer += data;
+      if (!inputFlushTimer) {
+        inputFlushTimer = setTimeout(() => {
+          if (inputBuffer && ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(inputBuffer);
+          }
+          inputBuffer = '';
+          inputFlushTimer = null;
+        }, INPUT_BATCH_MS);
       }
     });
 
