@@ -87,6 +87,44 @@ shell /path/to/your/.local/bin/tmux-kitty-shell
 
 Restart Kitty. Every new window will launch inside tmux, and the dashboard will show them with Kitty badges.
 
+## Local Network Fast-Path (Auto-Switching)
+
+When your phone/tablet is on the same network as the host PC (WiFi, hotspot), the app automatically switches from the Cloudflare tunnel to a direct local connection for dramatically lower latency.
+
+**How it works:**
+- The server runs HTTPS on port 7484 alongside HTTP on 7483
+- The client probes local IPs every 15 seconds
+- When a local connection succeeds, the WebSocket switches to the direct path
+- When the local connection is lost (left the network), it falls back to the tunnel
+- A green house icon in the header = local, orange globe = tunnel
+
+**One-time setup per device:**
+
+1. Generate certificates (done automatically by `install.sh`, or manually):
+   ```bash
+   ./scripts/generate-certs.sh
+   ```
+
+2. On your phone/tablet, open the app via the tunnel URL (e.g., `https://tui.yourdomain.com`)
+
+3. You'll see a small "accept local cert" link next to the last-updated timestamp — tap it
+
+4. Accept the certificate warning in the browser (this is a one-time step per device)
+
+5. The next probe cycle (within 15 seconds) will detect the local path and switch automatically
+
+**When does it activate?**
+- Phone connected to same WiFi as the host PC
+- Phone hotspot with the PC connected to it
+- Any network where both devices can reach each other directly
+
+**Regenerating certificates** (e.g., when your local IP changes):
+```bash
+./scripts/generate-certs.sh
+systemctl --user restart tui-browser
+```
+You'll need to re-accept the cert on your devices after regenerating.
+
 ## Remote Access (Cloudflare Tunnel)
 
 For secure access from anywhere (phone, other computers), use a [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/):
