@@ -60,6 +60,20 @@ function saveTitles() {
   } catch { /* ignore */ }
 }
 
+// Locked sessions: Set of session names protected from UI deletion
+const lockedSessions = new Set();
+const lockedPath = path.join(__dirname, '..', 'data', 'locked-sessions.json');
+try {
+  const saved = JSON.parse(fs.readFileSync(lockedPath, 'utf8'));
+  for (const name of saved) lockedSessions.add(name);
+} catch { /* no saved locks */ }
+
+function saveLocks() {
+  try {
+    fs.writeFileSync(lockedPath, JSON.stringify([...lockedSessions]));
+  } catch { /* ignore */ }
+}
+
 function extractContext(fullOutput) {
   const lines = fullOutput.split('\n');
 
@@ -209,6 +223,7 @@ function annotateSessions(sessionList) {
     s.webClients = sessions.getClientCount(s.name);
     const dt = displayTitles.get(s.name);
     if (dt && dt.title) s.displayTitle = dt.title;
+    s.locked = lockedSessions.has(s.name);
   }
 }
 
@@ -287,7 +302,7 @@ app.post('/api/sessions/bulk-kill', apiHandler(async (req, res) => {
     return res.status(400).json({ error: 'Cannot kill more than 100 sessions at once' });
   }
 
-  let targetNames = names;
+  let targetNames = names.filter(n => !lockedSessions.has(n));
 
   // Server-side verification: re-check filter conditions before killing
   if (filter) {
@@ -454,6 +469,17 @@ app.post('/api/sessions/:name/rename', apiHandler(async (req, res) => {
   displayTitles.set(req.params.name, { title: newName.trim(), manuallyRenamed: true, lastGenAt: Date.now(), lastLineCount: 0 });
   saveTitles();
   res.json({ ok: true });
+}));
+
+app.post('/api/sessions/:name/lock', apiHandler(async (req, res) => {
+  const name = req.params.name;
+  if (lockedSessions.has(name)) {
+    lockedSessions.delete(name);
+  } else {
+    lockedSessions.add(name);
+  }
+  saveLocks();
+  res.json({ locked: lockedSessions.has(name) });
 }));
 
 // ---------- HTTP + HTTPS + WebSocket ----------
