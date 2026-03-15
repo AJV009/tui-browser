@@ -41,6 +41,7 @@ const PANE_FORMAT = [
   '#{pane_width}',
   '#{pane_height}',
   '#{pane_active}',
+  '#{pane_title}',
 ].join(SEP);
 
 const CLIENT_FORMAT = ['#{client_pid}', '#{session_name}'].join(SEP);
@@ -83,7 +84,7 @@ async function listPanes(sessionName) {
   if (!raw) return [];
 
   return raw.split('\n').map((line) => {
-    const [id, tty, pid, command, width, height, active] = line.split(SEP);
+    const [id, tty, pid, command, width, height, active, title] = line.split(SEP);
     return {
       id,
       tty,
@@ -92,6 +93,7 @@ async function listPanes(sessionName) {
       width: parseInt(width, 10),
       height: parseInt(height, 10),
       active: active === '1',
+      title: title || '',
     };
   });
 }

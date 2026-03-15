@@ -108,6 +108,18 @@ const App = (() => {
     }, 30000);
   }
 
+  // ---------- High Contrast ----------
+
+  function initContrastToggle() {
+    const saved = localStorage.getItem('tui_high_contrast');
+    if (saved === '1') document.documentElement.classList.add('high-contrast');
+
+    document.getElementById('contrast-btn').addEventListener('click', () => {
+      const on = document.documentElement.classList.toggle('high-contrast');
+      localStorage.setItem('tui_high_contrast', on ? '1' : '0');
+    });
+  }
+
   // ---------- Online / Offline ----------
 
   function initConnectivityToasts() {
@@ -318,6 +330,9 @@ const App = (() => {
 
     // Online/offline detection
     initConnectivityToasts();
+
+    // High contrast toggle
+    initContrastToggle();
 
     // Start probing for local network fast path
     startLocalProbing();

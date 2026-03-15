@@ -324,7 +324,7 @@ const Dashboard = (() => {
   function renderSessionCard(s) {
     const pane = s.panes && s.panes[0];
     const cmd = pane ? pane.command : 'unknown';
-    const size = pane ? `${pane.width}x${pane.height}` : '';
+    const paneTitle = pane && pane.title ? pane.title : '';
     const created = new Date(s.created).toLocaleString();
     const hasKitty = s.kittyWindows && s.kittyWindows.length > 0;
 
@@ -372,10 +372,9 @@ const Dashboard = (() => {
         </div>
         ${kittyBadge}
         <div class="session-meta">
-          <span>cmd: ${esc(cmd)}</span>
-          <span>${s.windows} window${s.windows !== 1 ? 's' : ''}</span>
-          ${size ? `<span>${size}</span>` : ''}
+          <span>${esc(cmd)}</span>
           <span>${created}</span>
+          ${paneTitle ? `<span>${esc(paneTitle)}</span>` : ''}
         </div>
         <div class="session-actions">
           <button class="btn btn-primary btn-icon" data-action="connect" data-session="${esc(s.name)}" title="Connect">${ICON.connect}</button>
