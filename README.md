@@ -265,7 +265,10 @@ Connect to `/ws/terminal/:sessionName`:
 ```
 tui-browser/
 ├── server/
-│   ├── index.js              # HTTP + WebSocket server
+│   ├── index.js              # HTTP/HTTPS + WebSocket server orchestrator
+│   ├── routes.js             # All REST API route handlers
+│   ├── state.js              # Persistent state (display titles, locks)
+│   ├── ai-titles.js          # AI title generation via Claude CLI
 │   ├── session-manager.js    # PTY lifecycle, multi-client, Kitty launch
 │   ├── discovery.js          # tmux + unified discovery with PID matching
 │   ├── kitty-discovery.js    # Kitty remote control discovery
@@ -273,11 +276,19 @@ tui-browser/
 ├── public/
 │   ├── index.html            # SPA shell
 │   ├── js/
-│   │   ├── app.js            # Hash router
-│   │   ├── dashboard.js      # Unified session cards
-│   │   └── terminal.js       # xterm.js + WebSocket
+│   │   ├── app.js            # Hash router, modal, toast, version polling
+│   │   ├── app-network.js    # Local network fast-path detection
+│   │   ├── dashboard.js      # Session cards, rendering, CRUD
+│   │   ├── dashboard-shortcuts.js  # Quick Launch dropdown
+│   │   ├── dashboard-bulk-kill.js  # Selection + bulk kill modal
+│   │   ├── dashboard-info.js       # Session info overlay
+│   │   ├── terminal.js       # xterm.js setup + WebSocket connection
+│   │   └── terminal-controls.js    # Scroll, text select, session ops
 │   └── css/
-│       └── styles.css        # Dark theme
+│       ├── base.css           # Theme variables, header, buttons, modal
+│       ├── dashboard.css      # Session cards, toolbar, shortcuts
+│       ├── terminal.css       # Terminal view, quick-keys, scroll controls
+│       └── info-panel.css     # Session info overlay + stats
 ├── scripts/
 │   └── tmux-kitty-shell      # Wrapper: launches Kitty windows inside tmux
 ├── install.sh                # One-command setup
