@@ -21,6 +21,8 @@ const Dashboard = (() => {
     kill: '<svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6l10 10M16 6l-10 10"/></svg>',
     monitor: '<svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="18" height="12" rx="2"/><path d="M8 19h6M11 16v3"/></svg>',
     info: '<svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8.5"/><path d="M11 10v5.5M11 7v.01" stroke-linecap="round"/></svg>',
+    lock: '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="8" height="6" rx="1"/><path d="M5 6V4a2 2 0 0 1 4 0v2"/></svg>',
+    unlock: '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="8" height="6" rx="1"/><path d="M5 6V4a2 2 0 0 1 4 0"/></svg>',
   };
 
   let infoInterval = null;
@@ -43,6 +45,8 @@ const Dashboard = (() => {
         kill(btn.dataset.session);
       } else if (action === 'toggle-select') {
         toggleSelect(btn.dataset.session);
+      } else if (action === 'toggle-lock') {
+        toggleLock(btn.dataset.session);
       }
     });
 
@@ -358,10 +362,12 @@ const Dashboard = (() => {
     const label = s.displayTitle || s.name;
 
     const isSelected = selectedSessions.has(s.name);
+    const isLocked = s.locked;
 
     return `
-      <div class="session-card${hasKitty ? ' kitty-card' : ''}${isSelected ? ' session-selected' : ''}" data-session="${esc(s.name)}">
+      <div class="session-card${hasKitty ? ' kitty-card' : ''}${isSelected ? ' session-selected' : ''}${isLocked ? ' session-locked' : ''}" data-session="${esc(s.name)}">
         <div class="select-circle${isSelected ? ' selected' : ''}" data-action="toggle-select" data-session="${esc(s.name)}"></div>
+        <div class="lock-toggle${isLocked ? ' locked' : ''}" data-action="toggle-lock" data-session="${esc(s.name)}" title="${isLocked ? 'Unlock' : 'Lock'}">${isLocked ? ICON.lock : ICON.unlock}</div>
         <div class="session-card-header">
           <span class="session-name">${esc(label)}</span>
           <span class="session-status">
@@ -380,7 +386,7 @@ const Dashboard = (() => {
           <button class="btn btn-primary btn-icon" data-action="connect" data-session="${esc(s.name)}" title="Connect">${ICON.connect}</button>
           <button class="btn btn-secondary btn-icon" data-action="open-terminal" data-session="${esc(s.name)}" title="Open on PC">${ICON.monitor}</button>
           <button class="btn btn-secondary btn-icon" data-action="info" data-session="${esc(s.name)}" title="Session info">${ICON.info}</button>
-          <button class="btn btn-danger btn-icon" data-action="kill" data-session="${esc(s.name)}" title="Kill">${ICON.kill}</button>
+          <button class="btn btn-danger btn-icon${isLocked ? ' btn-locked' : ''}" data-action="kill" data-session="${esc(s.name)}" title="${isLocked ? 'Locked' : 'Kill'}"${isLocked ? ' disabled' : ''}>${ICON.kill}</button>
         </div>
       </div>`;
   }
@@ -469,6 +475,8 @@ const Dashboard = (() => {
   }
 
   async function kill(sessionName) {
+    const s = (lastSessions || []).find(x => x.name === sessionName);
+    if (s && s.locked) return;
     const confirmed = await App.showModal(
       `Kill session "${sessionName}"? This will terminate all processes in it.`,
       'Kill'
@@ -499,6 +507,13 @@ const Dashboard = (() => {
     updateBulkKillButton();
   }
 
+  async function toggleLock(name) {
+    try {
+      const res = await fetch(`/api/sessions/${encodeURIComponent(name)}/lock`, { method: 'POST' });
+      if (res.ok) await refresh();
+    } catch { /* ignore */ }
+  }
+
   function updateBulkKillButton() {
     const btn = document.getElementById('bulk-kill-btn');
     if (!btn) return;
@@ -515,9 +530,15 @@ const Dashboard = (() => {
 
   async function handleBulkKill() {
     if (selectedSessions.size > 0) {
-      const names = [...selectedSessions];
+      const sessions = lastSessions || [];
+      const lockedNames = new Set(sessions.filter(s => s.locked).map(s => s.name));
+      const names = [...selectedSessions].filter(n => !lockedNames.has(n));
+      if (names.length === 0) {
+        await App.showModal('All selected sessions are locked.', 'OK');
+        return;
+      }
       const confirmed = await App.showModal(
-        `Kill ${names.length} selected session${names.length > 1 ? 's' : ''}? This will terminate all processes in them.`,
+        `Kill ${names.length} selected session${names.length > 1 ? 's' : ''}? This will terminate all processes in them.${names.length < selectedSessions.size ? ' (locked sessions excluded)' : ''}`,
         'Kill'
       );
       if (!confirmed) return;
@@ -561,7 +582,7 @@ const Dashboard = (() => {
   }
 
   async function showBulkKillModal() {
-    const sessions = lastSessions || [];
+    const sessions = (lastSessions || []).filter(s => !s.locked);
     if (sessions.length === 0) {
       await App.showModal('No sessions to kill.', 'OK');
       return;

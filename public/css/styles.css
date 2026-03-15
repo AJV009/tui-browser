@@ -565,6 +565,41 @@ body {
   background: #ff405708 !important;
 }
 
+/* ========== Lock Toggle ========== */
+.lock-toggle {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  cursor: pointer;
+  color: var(--text-muted);
+  opacity: 1;
+  transition: all 0.15s;
+  z-index: 2;
+  padding: 4px;
+  border-radius: 4px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+
+.lock-toggle:hover {
+  color: var(--text-dim);
+  background: var(--surface-hover);
+}
+
+.lock-toggle.locked {
+  opacity: 1;
+  color: var(--orange);
+}
+
+.lock-toggle.locked:hover {
+  color: var(--text);
+}
+
+.btn-locked {
+  opacity: 0.25 !important;
+  pointer-events: none;
+}
+
 /* ========== Bulk Kill Button ========== */
 #bulk-kill-btn {
   position: relative;
@@ -1370,6 +1405,10 @@ body {
     padding: 12px 14px;
     font-size: 13px;
     min-height: 48px;
+  }
+
+  .lock-toggle {
+    opacity: 1;
   }
 
   .btn {
