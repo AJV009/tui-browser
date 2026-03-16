@@ -1,6 +1,6 @@
 # TUI Browser
 
-VNC for terminals. Access and control your terminal sessions from any browser — phone, tablet, or another computer. The browser and host terminal stay perfectly in sync, both viewing and controlling the same tmux session.
+VNC for terminals — not another SSH web client. Access and control your terminal sessions from any browser — phone, tablet, or another computer. The browser and host terminal stay perfectly in sync, both viewing and controlling the same tmux session. Unlike SSH tools that spawn isolated shells, this mirrors your actual desktop terminal in real-time.
 
 Built for TUI-heavy workflows (Claude Code, OpenCode, Codex, htop, etc.) where you want to start something on your desktop and check on it from your phone.
 
@@ -332,6 +332,37 @@ If the [Claude CLI](https://claude.com/claude-code) is installed, sessions can b
 4. **Both viewers** (Kitty + browser) see identical output — tmux handles multi-client sync natively
 5. **Creating a session** from the browser also opens a Kitty window on the host
 6. **Killing a session** from the browser closes the Kitty window automatically
+
+## Why Not Just SSH?
+
+SSH-based web terminals (WeTTY, shellinabox) and terminal sharing tools solve a different problem. They give you a *new* shell session in your browser. TUI Browser gives you your *existing* session — the one already running on your desktop.
+
+**The core difference is mirroring vs. remoting:**
+
+| | SSH web clients | TUI Browser |
+|---|---|---|
+| **What you see** | A new, separate shell | Your actual desktop terminal |
+| **Session relationship** | Independent — browser and desktop are different sessions | Shared — browser and desktop are the same session |
+| **Start a build on desktop, check from phone** | Can't — phone has its own shell | Yes — phone sees exactly what your desktop shows |
+| **Multiple viewers** | Each gets their own session | All see the same output, type into the same session |
+| **Session persistence** | Dies when browser tab closes | tmux session persists forever — reconnect anytime |
+| **TUI rendering (60fps)** | Varies — often broken through SSH layers | Native — raw PTY via node-pty + WebGL xterm.js |
+
+**Why WebSocket instead of SSH for transport?** SSH multiplexes its own channels and requires key/password auth on every connection — overhead that adds nothing when the server and terminal are on the same machine. WebSocket gives us raw bidirectional binary streaming over HTTPS with custom input batching (30ms buffer), JSON control messages for resize/attach/detach, and reconnection logic that SSH can't express. The browser connects to a local node-pty process that attaches to tmux — there's no remote host to SSH into.
+
+### Similar tools and how they compare
+
+| Tool | What it does | Key difference from TUI Browser |
+|------|-------------|------|
+| **ttyd** | Exposes a single terminal process to the browser | One-shot PTY — no session persistence, no mirroring, no dashboard |
+| **GoTTY** | Same concept as ttyd, in Go | Same limitations — single terminal, no multi-client sync |
+| **WeTTY** | SSH client in the browser (Node.js) | Spawns new SSH sessions — doesn't mirror your existing terminal |
+| **sshx** | Collaborative terminal sharing with multiplayer cursors | Separate sessions per user with shared view — no host terminal integration |
+| **tmate** | tmux fork for instant session sharing | Fork of tmux (not the real thing) — designed for pair programming, not mobile access to your own sessions |
+| **Upterm** | Terminal sharing via link | Focused on sharing with others, not on accessing your own sessions from your phone |
+| **Wave Terminal** | AI-powered desktop terminal app | Desktop app, not a web remote — different category entirely |
+
+TUI Browser sits in a unique spot: it's a **personal terminal dashboard** that mirrors your real desktop sessions to your phone/tablet, with session discovery, lifecycle management, and a mobile-optimized UI. The closest analogy is VNC — but for your terminal, not your whole screen.
 
 ## License
 
