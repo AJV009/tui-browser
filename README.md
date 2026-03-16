@@ -1,28 +1,31 @@
-# TUI Browser
+<p align="center">
+  <img src="public/icons/icon-512-flat.png" alt="TUI Browser" width="128">
+</p>
 
-VNC for terminals — not another SSH web client. Access and control your terminal sessions from any browser — phone, tablet, or another computer. The browser and host terminal stay perfectly in sync, both viewing and controlling the same tmux session. Unlike SSH tools that spawn isolated shells, this mirrors your actual desktop terminal in real-time.
+<h1 align="center">TUI Browser</h1>
+
+<p align="center">
+  <strong>VNC for terminals</strong> — not another SSH web client.<br>
+  Mirrors your actual desktop terminal to any browser in real-time.
+</p>
+
+<p align="center">
+  <a href="#quick-start">Quick Start</a> &middot;
+  <a href="#features">Features</a> &middot;
+  <a href="#why-not-just-ssh">Why Not SSH?</a> &middot;
+  <a href="#api">API</a>
+</p>
+
+---
+
+Access and control your terminal sessions from any browser — phone, tablet, or another computer. The browser and host terminal stay perfectly in sync, both viewing and controlling the same tmux session. Unlike SSH tools that spawn isolated shells, this mirrors your actual desktop terminal in real-time.
 
 Built for TUI-heavy workflows (Claude Code, OpenCode, Codex, htop, etc.) where you want to start something on your desktop and check on it from your phone.
 
-```
-Phone/Tablet/Laptop Browser              Host Machine (Kitty + tmux)
-┌──────────────────────────┐            ┌────────────────────────────────────┐
-│  Dashboard               │            │  Node.js Server (port 7483)       │
-│  ┌─────────────────────┐ │   HTTPS    │  ├── REST API (session CRUD)      │
-│  │ Unified session     │ │◄══════════►│  ├── WebSocket (terminal I/O)     │
-│  │ cards with Kitty    │ │  Cloudflare│  ├── tmux discovery               │
-│  │ badges              │ │   Tunnel   │  ├── Kitty discovery + PID match  │
-│  └─────────────────────┘ │            │  └── session-manager (node-pty)   │
-│  Terminal View           │            │       └── tmux attach             │
-│  ┌─────────────────────┐ │            └────────────────────────────────────┘
-│  │ xterm.js (WebGL)    │ │                       │
-│  │ Full bidirectional  │ │                       ▼
-│  │ terminal I/O        │ │            ┌────────────────────┐
-│  └─────────────────────┘ │            │ tmux session       │
-└──────────────────────────┘            │ (shared by Kitty   │
-                                        │  + browser)        │
-                                        └────────────────────┘
-```
+<p align="center">
+  <img src="public/readme_assets/session_listing.png" alt="Session dashboard" width="720">
+  <br><sub>Session dashboard — AI-generated titles, status indicators, quick actions</sub>
+</p>
 
 ## Features
 
@@ -45,6 +48,19 @@ Phone/Tablet/Laptop Browser              Host Machine (Kitty + tmux)
 - **Auto-restart** — systemd service with file watcher restarts the server on code changes
 - **Cloudflare Tunnel** — secure remote access via HTTPS with zero port forwarding
 - **Zero build frontend** — vanilla JS, xterm.js from CDN, no bundler
+
+<table>
+  <tr>
+    <td align="center">
+      <img src="public/readme_assets/temrinal_view.png" alt="Terminal view" width="400">
+      <br><sub>Terminal view — xterm.js with WebGL, quick-keys, scroll controls</sub>
+    </td>
+    <td align="center">
+      <img src="public/readme_assets/session_info.png" alt="Session info panel" width="400">
+      <br><sub>Session info — live memory, CPU, process tree, recent output</sub>
+    </td>
+  </tr>
+</table>
 
 ## Quick Start
 
@@ -326,12 +342,34 @@ If the [Claude CLI](https://claude.com/claude-code) is installed, sessions can b
 
 ## How It Works
 
+```
+Phone/Tablet/Laptop Browser              Host Machine (Kitty + tmux)
+┌──────────────────────────┐            ┌────────────────────────────────────┐
+│  Dashboard               │            │  Node.js Server (port 7483)       │
+│  ┌─────────────────────┐ │   HTTPS    │  ├── REST API (session CRUD)      │
+│  │ Unified session     │ │◄══════════►│  ├── WebSocket (terminal I/O)     │
+│  │ cards with Kitty    │ │  Cloudflare│  ├── tmux discovery               │
+│  │ badges              │ │   Tunnel   │  ├── Kitty discovery + PID match  │
+│  └─────────────────────┘ │            │  └── session-manager (node-pty)   │
+│  Terminal View           │            │       └── tmux attach             │
+│  ┌─────────────────────┐ │            └────────────────────────────────────┘
+│  │ xterm.js (WebGL)    │ │                       │
+│  │ Full bidirectional  │ │                       ▼
+│  │ terminal I/O        │ │            ┌────────────────────┐
+│  └─────────────────────┘ │            │ tmux session       │
+└──────────────────────────┘            │ (shared by Kitty   │
+                                        │  + browser)        │
+                                        └────────────────────┘
+```
+
 1. **Every Kitty window runs inside tmux** via a wrapper script (`tmux-kitty-shell`)
 2. **PID matching** links Kitty windows to tmux sessions (`kitty_window.pid == tmux_client.client_pid`)
 3. **Browser connects** to the same tmux session via node-pty + WebSocket
 4. **Both viewers** (Kitty + browser) see identical output — tmux handles multi-client sync natively
 5. **Creating a session** from the browser also opens a Kitty window on the host
 6. **Killing a session** from the browser closes the Kitty window automatically
+
+---
 
 ## Why Not Just SSH?
 
@@ -363,6 +401,8 @@ SSH-based web terminals (WeTTY, shellinabox) and terminal sharing tools solve a 
 | **Wave Terminal** | AI-powered desktop terminal app | Desktop app, not a web remote — different category entirely |
 
 TUI Browser sits in a unique spot: it's a **personal terminal dashboard** that mirrors your real desktop sessions to your phone/tablet, with session discovery, lifecycle management, and a mobile-optimized UI. The closest analogy is VNC — but for your terminal, not your whole screen.
+
+---
 
 ## License
 
