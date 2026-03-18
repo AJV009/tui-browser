@@ -29,27 +29,38 @@ Built for TUI-heavy workflows (Claude Code, OpenCode, Codex, htop, etc.) where y
 
 ## Features
 
+### Core
+
 - **VNC-style mirroring** — browser and Kitty terminal show the exact same content. Type in either, both update.
-- **Unified dashboard** — tmux sessions enriched with Kitty metadata (tab title, focus state, viewer count)
-- **Auto-discovery** — PID matching links Kitty windows to their tmux sessions automatically
 - **Session management** — create, connect, kill, rename sessions from the browser. New sessions also open a Kitty window on the host.
-- **Bulk session kill** — select multiple sessions to kill at once, or use filter presets: detached, idle, no running commands, or all
-- **Session info panel** — live-updating stats: memory, CPU, process tree, uptime, recent terminal output
-- **AI session titles** — uses Claude CLI (haiku) to auto-generate contextual session names from terminal output
-- **Quick Launch** — preset and custom commands saved to `shortcuts.json`, launch sessions in one tap
-- **Session sorting** — sort by newest, oldest, recently active, or least active
-- **Open on PC** — relaunch dangling sessions into a Kitty window from the dashboard
-- **Multi-client** — multiple browsers can connect to the same session
-- **60fps TUI support** — tmux + xterm.js WebGL handles high-frequency rendering (Claude Code, Ratatui apps, etc.)
+- **Multi-client** — multiple browsers can connect to the same session simultaneously.
+- **AI session titles** — uses Claude CLI (haiku) to auto-generate contextual session names from terminal output.
+- **Claude Code detection** — auto-detects Claude Code sessions and shows a Claude icon button when remote-control is active. Click to copy the URL, double-click to open it.
 - **Text input panel** — compose text and send it to the terminal in one shot (like paste), avoids mobile keystroke drops. Pen icon in the quick-keys bar.
-- **Claude Code detection** — auto-detects Claude Code sessions and shows a Claude icon button when remote-control is active. Click to copy the remote-control URL, double-click to open it.
-- **Mobile-optimized** — quick-keys bar (toggleable on all screen sizes), scroll controls, text selection overlay, keyboard-aware viewport
-- **PWA with auto-update** — installable app, polls server version, auto-reloads on code changes
-- **Online/offline detection** — toast notifications for connectivity changes
-- **Cache-first rendering** — sessions load instantly from cache, no flash on page load or phone wake
-- **Auto-restart** — systemd service with file watcher restarts the server on code changes
-- **Cloudflare Tunnel** — secure remote access via HTTPS with zero port forwarding
-- **Zero build frontend** — vanilla JS, xterm.js from CDN, no bundler
+- **Mobile-optimized** — quick-keys bar (toggleable on all screen sizes), scroll controls, text selection overlay, keyboard-aware viewport.
+
+### Dashboard & Session Tools
+
+- **Unified dashboard** — tmux sessions enriched with Kitty metadata (tab title, focus state, viewer count).
+- **Quick Launch** — preset and custom commands saved to `shortcuts.json`, launch sessions in one tap.
+- **Bulk session kill** — select multiple sessions to kill at once, or use filter presets: detached, idle, no running commands, or all.
+- **Session info panel** — live-updating stats: memory, CPU, process tree, uptime, recent terminal output.
+- **Session locking** — lock sessions to prevent accidental kills. Locked sessions disable the kill button.
+- **Session sorting** — sort by newest, oldest, recently active, or least active.
+- **Font size controls** — zoom in/out on the terminal view with +/- buttons.
+- **Open on PC** — relaunch dangling sessions into a Kitty window from the dashboard.
+
+### Under the Hood
+
+- **Local network fast-path** — auto-switches between Cloudflare tunnel and direct LAN connection for lowest latency. Green house icon = local, orange globe = tunnel.
+- **Auto-discovery** — PID matching links Kitty windows to their tmux sessions automatically.
+- **60fps TUI rendering** — tmux + xterm.js WebGL handles high-frequency output (Claude Code, Ratatui apps, etc.)
+- **PWA with auto-update** — installable app, polls server version, auto-reloads on code changes.
+- **Cache-first rendering** — sessions load instantly from cache, no flash on page load or phone wake.
+- **Online/offline detection** — toast notifications for connectivity changes.
+- **Auto-restart** — systemd service with file watcher restarts the server on code changes.
+- **Cloudflare Tunnel support** — secure remote access via HTTPS with zero port forwarding.
+- **Zero build frontend** — vanilla JS, xterm.js from CDN, no bundler.
 
 <table>
   <tr>
