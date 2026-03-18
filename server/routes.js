@@ -169,6 +169,13 @@ function setup(app, { discovery, sessions, kittyDiscovery, state, aiTitles, conf
     });
   }));
 
+  // ---------- Claude Code Detection ----------
+
+  app.get('/api/sessions/:name/claude-status', apiHandler(async (req, res) => {
+    const claudeDetect = require('./claude-detect');
+    res.json(await claudeDetect.detectClaude(req.params.name));
+  }));
+
   // ---------- Shortcuts / Titles / Rename / Lock ----------
 
   const shortcutsPath = path.join(__dirname, '..', 'public', 'shortcuts.json');

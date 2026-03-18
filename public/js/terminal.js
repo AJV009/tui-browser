@@ -12,6 +12,7 @@ const TerminalView = (() => {
   let ws = null;
   let currentSession = null;
   let heartbeatInterval = null;
+  let claudeRemoteUrl = null;
 
   function optimalFontSize() { return 14; }
 
@@ -128,6 +129,20 @@ const TerminalView = (() => {
       if (currentSession) connect(currentSession);
     });
 
+    // Claude remote control button — click to copy, double-click to open
+    const claudeBtn = document.getElementById('claude-remote-btn');
+    claudeBtn.addEventListener('click', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      if (!claudeRemoteUrl) return;
+      navigator.clipboard.writeText(claudeRemoteUrl).then(() => {
+        App.showToast('Remote control URL copied!');
+      });
+    });
+    claudeBtn.addEventListener('dblclick', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      if (claudeRemoteUrl) window.open(claudeRemoteUrl, '_blank');
+    });
+
     // Click terminal to focus
     document.getElementById('terminal-container').addEventListener('click', () => { if (term) term.focus(); });
 
@@ -172,6 +187,7 @@ const TerminalView = (() => {
       }, 50);
 
       term.focus();
+      checkClaudeStatus(sessionName);
     };
 
     ws.onmessage = (ev) => {
@@ -206,9 +222,26 @@ const TerminalView = (() => {
     TerminalControls.stopScrolling();
     TerminalControls.exitScrollMode();
     TerminalTextInput.close();
+    hideClaudeRemote();
     if (ws) { ws.onclose = null; ws.close(); ws = null; }
     currentSession = null;
     setStatus('', 'Disconnected');
+  }
+
+  async function checkClaudeStatus(sessionName) {
+    try {
+      const res = await fetch(`/api/sessions/${encodeURIComponent(sessionName)}/claude-status`);
+      const data = await res.json();
+      if (data.remoteControlUrl) {
+        claudeRemoteUrl = data.remoteControlUrl;
+        document.getElementById('claude-remote-btn').style.display = 'flex';
+      }
+    } catch { /* ignore */ }
+  }
+
+  function hideClaudeRemote() {
+    claudeRemoteUrl = null;
+    document.getElementById('claude-remote-btn').style.display = 'none';
   }
 
   function setStatus(state, text) {
