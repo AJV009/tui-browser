@@ -54,7 +54,6 @@
   border: 1px solid var(--danger-dim);
   background: var(--danger-dim);
   color: var(--danger);
-  font-size: 12px;
   margin-left: 4px;
 }
 
@@ -65,7 +64,6 @@
   border: 1px solid var(--danger-dim);
   background: var(--danger-dim);
   color: var(--danger);
-  font-size: 14px;
 }
 
 .reconnect-btn:hover { background: #ff405744; color: #fff; }
@@ -116,6 +114,9 @@
 
 .qk:active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
 .qk-accent { background: var(--accent-dim); color: var(--accent); border-color: var(--accent-dim); }
+.qk.active { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+
+.terminal-quickbar.quickbar-open { display: flex; }
 
 .qk-sep {
   width: 1px; align-self: stretch; margin: 8px 0; background: var(--border); flex-shrink: 0;
@@ -169,9 +170,103 @@
   background: var(--bg); user-select: text; -webkit-user-select: text; white-space: pre-wrap; word-break: break-all;
 }
 
+/* ========== Text Input Pill ========== */
+.text-input-pill {
+  display: flex; flex-direction: column; align-items: center;
+  border: 1px solid var(--border-hover); border-radius: 6px;
+  background: var(--surface-hover); overflow: hidden;
+}
+
+.text-input-pill-btn {
+  width: 32px; height: 32px; border: none; background: transparent; color: var(--text);
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+  user-select: none; transition: background 0.1s;
+}
+
+.text-input-pill-btn:active { background: var(--accent-dim); color: var(--accent); }
+.text-input-pill-btn.active { background: var(--accent-dim); color: var(--accent); border-color: var(--accent); }
+
+/* ========== Text Input Panel ========== */
+.text-input-panel {
+  background: var(--surface); border-top: 1px solid var(--border);
+  display: flex; flex-direction: column; flex-shrink: 0;
+}
+
+.text-input-header {
+  display: none; align-items: center; justify-content: space-between;
+  padding: 8px 12px; border-bottom: 1px solid var(--border);
+}
+
+.text-input-label {
+  font-family: var(--mono); font-size: 12px; font-weight: 600;
+  color: var(--accent); letter-spacing: 0.5px;
+}
+
+.text-input-header-actions { display: flex; gap: 6px; }
+
+.text-input-header-btn {
+  width: 28px; height: 28px; border: 1px solid var(--border); border-radius: 6px;
+  background: var(--surface-hover); color: var(--text-dim); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  touch-action: manipulation;
+}
+
+.text-input-header-btn:hover { color: var(--text); border-color: var(--text-dim); }
+
+.text-input-body {
+  display: flex; align-items: flex-end; gap: 8px; padding: 8px;
+}
+
+.text-input-body textarea {
+  flex: 1; resize: none; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--bg); color: var(--text); font-family: var(--mono);
+  font-size: 14px; line-height: 20px; padding: 8px 10px; outline: none;
+  overflow-y: auto;
+}
+
+.text-input-body textarea::placeholder { color: var(--text-dim); }
+.text-input-body textarea:focus { border-color: var(--accent); }
+
+.text-input-body-btn {
+  width: 38px; height: 38px; border: 1px solid var(--border); border-radius: 50%;
+  background: var(--surface-hover); color: var(--text-dim); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; touch-action: manipulation;
+  transition: all 0.15s;
+}
+
+.text-input-body-btn:active { background: var(--accent-dim); color: var(--accent); border-color: var(--accent); }
+
+.text-input-send-btn {
+  width: 38px; height: 38px; border: none; border-radius: 50%;
+  background: var(--accent); color: var(--bg); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; touch-action: manipulation;
+  transition: opacity 0.15s;
+}
+
+.text-input-send-btn:active { opacity: 0.7; }
+
+.text-input-hint {
+  font-family: var(--mono); font-size: 10px; color: var(--text-dim);
+  text-align: center; padding: 0 8px 6px;
+}
+
+/* Fullscreen mode */
+.text-input-panel.text-input-fullscreen {
+  position: fixed; inset: 0; z-index: 90;
+}
+
+.text-input-panel.text-input-fullscreen .text-input-header { display: flex; }
+.text-input-panel.text-input-fullscreen .text-input-body { flex: 1; }
+.text-input-panel.text-input-fullscreen .text-input-body textarea { flex: 1; align-self: stretch; }
+.text-input-panel.text-input-fullscreen .text-input-hint { display: none; }
+
 /* ========== Terminal Responsive ========== */
 @media (max-width: 768px) {
   .terminal-toolbar { padding: 6px 10px; }
-  .terminal-quickbar { display: flex; padding-bottom: max(5px, env(safe-area-inset-bottom)); }
+  .terminal-quickbar.quickbar-open { padding-bottom: max(5px, env(safe-area-inset-bottom)); }
   .qk { height: 46px; font-size: 15px; }
+  .text-input-body textarea { font-size: 16px; }
 }

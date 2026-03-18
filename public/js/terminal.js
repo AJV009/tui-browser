@@ -138,6 +138,8 @@ const TerminalView = (() => {
       getSession: () => currentSession,
     });
 
+    TerminalTextInput.init({ term });
+
     updateZoomLabel();
   }
 
@@ -203,6 +205,7 @@ const TerminalView = (() => {
     if (heartbeatInterval) { clearInterval(heartbeatInterval); heartbeatInterval = null; }
     TerminalControls.stopScrolling();
     TerminalControls.exitScrollMode();
+    TerminalTextInput.close();
     if (ws) { ws.onclose = null; ws.close(); ws = null; }
     currentSession = null;
     setStatus('', 'Disconnected');
