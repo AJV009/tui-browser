@@ -68,6 +68,15 @@
 
 .reconnect-btn:hover { background: #ff405744; color: #fff; }
 
+.claude-remote-btn {
+  width: 32px; height: 32px;
+  border: 1px solid #da775633;
+  background: #da775622;
+  color: #da7756;
+}
+
+.claude-remote-btn:hover { background: #da775644; color: #e8956f; }
+
 /* ========== Zoom Pill ========== */
 .zoom-pill {
   display: flex; flex-direction: column; align-items: center;

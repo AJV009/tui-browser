@@ -41,7 +41,9 @@ Built for TUI-heavy workflows (Claude Code, OpenCode, Codex, htop, etc.) where y
 - **Open on PC** — relaunch dangling sessions into a Kitty window from the dashboard
 - **Multi-client** — multiple browsers can connect to the same session
 - **60fps TUI support** — tmux + xterm.js WebGL handles high-frequency rendering (Claude Code, Ratatui apps, etc.)
-- **Mobile-optimized** — quick-keys bar, scroll controls, text selection overlay, keyboard-aware viewport
+- **Text input panel** — compose text and send it to the terminal in one shot (like paste), avoids mobile keystroke drops. Pen icon in the quick-keys bar.
+- **Claude Code detection** — auto-detects Claude Code sessions and shows a Claude icon button when remote-control is active. Click to copy the remote-control URL, double-click to open it.
+- **Mobile-optimized** — quick-keys bar (toggleable on all screen sizes), scroll controls, text selection overlay, keyboard-aware viewport
 - **PWA with auto-update** — installable app, polls server version, auto-reloads on code changes
 - **Online/offline detection** — toast notifications for connectivity changes
 - **Cache-first rendering** — sessions load instantly from cache, no flash on page load or phone wake
@@ -252,6 +254,7 @@ systemctl --user stop tui-browser-tunnel
 | `GET` | `/api/sessions` | List tmux sessions |
 | `GET` | `/api/sessions/:name` | Session details + preview |
 | `GET` | `/api/sessions/:name/info` | Live session stats (memory, CPU, processes, output) |
+| `GET` | `/api/sessions/:name/claude-status` | Detect Claude Code session + remote-control URL |
 | `GET` | `/api/kitty/windows` | Kitty window discovery (debug, prefer `/api/discover`) |
 | `POST` | `/api/sessions` | Create session `{ name, command, cwd }` |
 | `POST` | `/api/sessions/bulk-kill` | Bulk kill `{ names[], filter?, inactiveMinutes? }` |
@@ -288,6 +291,7 @@ tui-browser/
 │   ├── session-manager.js    # PTY lifecycle, multi-client, Kitty launch
 │   ├── discovery.js          # tmux + unified discovery with PID matching
 │   ├── kitty-discovery.js    # Kitty remote control discovery
+│   ├── claude-detect.js      # Claude Code session + remote-control detection
 │   └── exec-util.js          # Shared subprocess utility
 ├── public/
 │   ├── index.html            # SPA shell
@@ -299,6 +303,7 @@ tui-browser/
 │   │   ├── dashboard-bulk-kill.js  # Selection + bulk kill modal
 │   │   ├── dashboard-info.js       # Session info overlay
 │   │   ├── terminal.js       # xterm.js setup + WebSocket connection
+│   │   ├── terminal-text-input.js  # Compose-and-send text panel + quickbar toggle
 │   │   └── terminal-controls.js    # Scroll, text select, session ops
 │   └── css/
 │       ├── base.css           # Theme variables, header, buttons, modal
@@ -315,7 +320,8 @@ tui-browser/
 
 The terminal view includes touch-optimized controls:
 
-- **Quick-keys bar** — Esc, Tab, Ctrl+C/D/Z, arrow keys, and a Sel (text select) button
+- **Quick-keys bar** — Esc, Tab, Ctrl+C/D/Z, arrow keys, Sel (text select), and a pen icon to open the text input panel. Always visible on mobile, toggled via the pill button on desktop/tablet.
+- **Text input panel** — compose text freely, then send to terminal in one shot. Enter sends, Shift+Enter for newlines, auto-expands up to 5 lines. Fullscreen mode for longer text.
 - **Scroll controls** — floating up/down buttons (top-right) to scroll tmux history via copy-mode
 - **Text selection** — tap Sel to open terminal output in a native-selectable overlay with Copy All
 - **Keyboard awareness** — UI shifts above the soft keyboard automatically
