@@ -189,6 +189,7 @@ const TerminalControls = (() => {
 
   function openTextSelect() {
     if (!_term) return;
+    TerminalTextInput.close();
     const buf = _term.buffer.active;
     let lines = [];
     for (let i = 0; i < buf.length; i++) {
@@ -205,5 +206,5 @@ const TerminalControls = (() => {
     if (_term) _term.focus();
   }
 
-  return { init, stopScrolling, exitScrollMode };
+  return { init, stopScrolling, exitScrollMode, closeTextSelect };
 })();
