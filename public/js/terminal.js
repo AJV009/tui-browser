@@ -13,6 +13,8 @@ const TerminalView = (() => {
   let currentSession = null;
   let heartbeatInterval = null;
   let claudeRemoteUrl = null;
+  let connectResolvers = [];
+  let isTouchUser = false;
 
   function optimalFontSize() { return 14; }
 
@@ -81,6 +83,7 @@ const TerminalView = (() => {
       xtermTextarea.setAttribute('autocapitalize', 'off');
       xtermTextarea.setAttribute('autocomplete', 'off');
       xtermTextarea.setAttribute('spellcheck', 'false');
+      xtermTextarea.setAttribute('virtualkeyboardpolicy', 'manual');
     }
 
     // WebGL addon
@@ -143,17 +146,56 @@ const TerminalView = (() => {
       if (claudeRemoteUrl) window.open(claudeRemoteUrl, '_blank');
     });
 
-    // Click terminal to focus
-    document.getElementById('terminal-container').addEventListener('click', () => { if (term) term.focus(); });
+    // Detect touch users — gate auto-focus to prevent unwanted keyboard
+    window.addEventListener('touchstart', () => { isTouchUser = true; }, { once: true, passive: true });
+
+    // Click terminal to focus — but not on touch (keyboard button handles that)
+    document.getElementById('terminal-container').addEventListener('click', (e) => {
+      if (isTouchUser) return;
+      if (term) term.focus();
+    });
+
+    // Keyboard toggle button (uses VirtualKeyboard API on Android Chrome, blur/focus fallback elsewhere)
+    let kbOpen = false;
+    let kbTapping = false;
+    const kbBtn = document.getElementById('keyboard-toggle-btn');
+    const vk = navigator.virtualKeyboard || null;
+
+    kbBtn.addEventListener('touchstart', () => { kbTapping = true; }, { passive: true });
+
+    kbBtn.addEventListener('click', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      kbTapping = false;
+      if (kbOpen) {
+        if (vk) vk.hide();
+        else document.querySelector('#terminal-container .xterm-helper-textarea')?.blur();
+        kbOpen = false;
+        kbBtn.classList.remove('active');
+      } else if (term) {
+        term.focus();
+        if (vk) vk.show();
+        kbOpen = true;
+        kbBtn.classList.add('active');
+      }
+    });
+
+    // Sync state when keyboard is dismissed externally (swipe down, back button, etc)
+    const xtArea = document.querySelector('#terminal-container .xterm-helper-textarea');
+    if (xtArea) xtArea.addEventListener('blur', () => {
+      if (kbTapping) return; // blur caused by tapping KB button — let click handler deal with it
+      kbOpen = false;
+      kbBtn.classList.remove('active');
+    });
 
     // Initialize controls (scroll, text select, quickbar, session ops)
     TerminalControls.init({
       term,
       getWs: () => ws,
       getSession: () => currentSession,
+      ensureConnected,
     });
 
-    TerminalTextInput.init({ term });
+    TerminalTextInput.init({ term, ensureConnected });
 
     updateZoomLabel();
   }
@@ -161,13 +203,22 @@ const TerminalView = (() => {
   // ---------- WebSocket Connection ----------
 
   function connect(sessionName) {
-    disconnect();
+    // Lightweight cleanup — preserves UI state (text input panel, quickbar, scroll mode)
+    if (heartbeatInterval) { clearInterval(heartbeatInterval); heartbeatInterval = null; }
+    TerminalControls.stopScrolling();
+    if (ws) { ws.onclose = null; ws.onerror = null; ws.close(); ws = null; }
+
     currentSession = sessionName;
     setStatus('connecting', 'Connecting\u2026');
     term.clear();
 
     try { ws = new WebSocket(App.getWsUrl(sessionName)); }
-    catch { setStatus('error', 'Failed to connect'); return; }
+    catch {
+      setStatus('error', 'Failed to connect');
+      const pending = connectResolvers.splice(0);
+      pending.forEach(r => r.reject(new Error('Failed to connect')));
+      return;
+    }
 
     ws.binaryType = 'arraybuffer';
 
@@ -186,8 +237,11 @@ const TerminalView = (() => {
         ws.send(JSON.stringify({ type: 'attach', cols: term.cols, rows: term.rows }));
       }, 50);
 
-      term.focus();
+      if (!isTouchUser) term.focus();
       checkClaudeStatus(sessionName);
+
+      const pending = connectResolvers.splice(0);
+      pending.forEach(r => r.resolve());
     };
 
     ws.onmessage = (ev) => {
@@ -212,9 +266,32 @@ const TerminalView = (() => {
       if (heartbeatInterval) { clearInterval(heartbeatInterval); heartbeatInterval = null; }
       setStatus('error', 'Disconnected');
       if (typeof App.onNetworkChange === 'function') App.onNetworkChange();
+      const pending = connectResolvers.splice(0);
+      pending.forEach(r => r.reject(new Error('Disconnected')));
     };
 
-    ws.onerror = () => setStatus('error', 'Connection error');
+    ws.onerror = () => {
+      setStatus('error', 'Connection error');
+      const pending = connectResolvers.splice(0);
+      pending.forEach(r => r.reject(new Error('Connection error')));
+    };
+  }
+
+  function ensureConnected() {
+    if (ws && ws.readyState === WebSocket.OPEN) return Promise.resolve();
+    if (!currentSession) return Promise.reject(new Error('No session'));
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        connectResolvers = connectResolvers.filter(r => r !== entry);
+        reject(new Error('Connection timeout'));
+      }, 5000);
+      const entry = {
+        resolve() { clearTimeout(timer); resolve(); },
+        reject(e) { clearTimeout(timer); reject(e); },
+      };
+      connectResolvers.push(entry);
+      if (!ws || ws.readyState !== WebSocket.CONNECTING) connect(currentSession);
+    });
   }
 
   function disconnect() {
