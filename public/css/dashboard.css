@@ -149,6 +149,11 @@
 
 .session-actions { display: flex; gap: 8px; }
 
+.session-expiry {
+  font-family: var(--mono); font-size: 10px; color: var(--danger);
+  margin-bottom: 8px; opacity: 0.8;
+}
+
 /* ========== Selection Circle ========== */
 .select-circle {
   position: absolute; top: 12px; left: 10px; width: 16px; height: 16px; border-radius: 50%;
