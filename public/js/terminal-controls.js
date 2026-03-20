@@ -9,15 +9,22 @@ const TerminalControls = (() => {
   let _term = null;
   let _getWs = null;
   let _getSession = null;
+  let _ensureConnected = null;
   let inScrollMode = false;
   let scrollInterval = null;
   let scrollStartTimer = null;
   let scrollSafetyTimer = null;
+  let swipeTouchY = null;
+  let swipeAccum = 0;
+  let swipeTmuxOffset = 0;
+  let swipeReady = false;
+  let swipeQueuedLines = 0;
 
-  function init({ term, getWs, getSession }) {
+  function init({ term, getWs, getSession, ensureConnected }) {
     _term = term;
     _getWs = getWs;
     _getSession = getSession;
+    _ensureConnected = ensureConnected;
 
     // Kill button
     document.getElementById('terminal-kill-btn').addEventListener('click', async (e) => {
@@ -88,12 +95,16 @@ const TerminalControls = (() => {
       'up': '\x1b[A', 'down': '\x1b[B', 'left': '\x1b[D', 'right': '\x1b[C',
     };
 
-    document.getElementById('terminal-quickbar').addEventListener('touchstart', (e) => {
+    document.getElementById('terminal-quickbar').addEventListener('touchstart', async (e) => {
       const btn = e.target.closest('.qk');
       if (!btn) return;
       e.preventDefault();
       const seq = QK_MAP[btn.dataset.qk];
-      if (seq && _term) _term.input(seq, true);
+      if (!seq || !_term) return;
+      try {
+        if (_ensureConnected) await _ensureConnected();
+        _term.input(seq, true);
+      } catch { /* silently ignore for ephemeral keys */ }
     }, { passive: false });
 
     // Text select overlay
@@ -136,6 +147,33 @@ const TerminalControls = (() => {
         exitScrollMode();
       }
     });
+
+    // Swipe-to-scroll on terminal container
+    const container = document.getElementById('terminal-container');
+
+    container.addEventListener('touchstart', (e) => {
+      if (e.touches.length !== 1) return;
+      swipeTouchY = e.touches[0].clientY;
+      swipeAccum = 0;
+    }, { passive: true });
+
+    container.addEventListener('touchmove', (e) => {
+      if (swipeTouchY === null || e.touches.length !== 1 || !_term) return;
+      const currentY = e.touches[0].clientY;
+      const pixelDelta = currentY - swipeTouchY; // positive = finger moved down (scroll up)
+      if (Math.abs(pixelDelta) > 2) e.preventDefault();
+      swipeTouchY = currentY;
+
+      swipeAccum += pixelDelta;
+      const lineH = Math.round(container.clientHeight / _term.rows) || 16;
+      const lines = Math.trunc(swipeAccum / lineH);
+      if (lines === 0) return;
+      swipeAccum -= lines * lineH;
+      handleSwipeLines(lines);
+    }, { passive: false });
+
+    container.addEventListener('touchend', () => { swipeTouchY = null; });
+    container.addEventListener('touchcancel', () => { swipeTouchY = null; });
   }
 
   // ---------- Scroll Mode ----------
@@ -154,7 +192,57 @@ const TerminalControls = (() => {
   function exitScrollMode() {
     if (!inScrollMode) return;
     inScrollMode = false;
+    swipeTmuxOffset = 0;
+    swipeReady = false;
+    swipeQueuedLines = 0;
     document.getElementById('scroll-controls').classList.remove('active');
+  }
+
+  function handleSwipeLines(lines) {
+    // lines > 0 = swiping up (earlier content), lines < 0 = swiping down (recent content)
+    if (!inScrollMode) {
+      enterScrollMode();
+      swipeTmuxOffset = 0;
+      swipeReady = false;
+      swipeQueuedLines = lines;
+      // Wait for Ctrl+B (0ms) + [ (30ms) + tmux processing before sending arrows
+      setTimeout(() => {
+        swipeReady = true;
+        if (swipeQueuedLines > 0) {
+          swipeTmuxOffset = swipeQueuedLines;
+          sendTmuxArrows(swipeQueuedLines);
+        }
+        swipeQueuedLines = 0;
+      }, 120);
+      return;
+    }
+    if (!swipeReady) {
+      // Still waiting for copy-mode — accumulate
+      swipeQueuedLines += lines;
+      return;
+    }
+    if (lines < 0) {
+      swipeTmuxOffset -= Math.abs(lines);
+      if (swipeTmuxOffset <= 0) {
+        const ws = _getWs();
+        if (ws && ws.readyState === WebSocket.OPEN) ws.send('q');
+        exitScrollMode();
+        return;
+      }
+    } else {
+      swipeTmuxOffset += lines;
+    }
+    sendTmuxArrows(lines);
+  }
+
+  function sendTmuxArrows(lines) {
+    const ws = _getWs();
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    const seq = lines > 0 ? '\x1b[A' : '\x1b[B';
+    const count = Math.abs(lines);
+    let payload = '';
+    for (let i = 0; i < count; i++) payload += seq;
+    ws.send(payload);
   }
 
   function startScrolling(direction) {

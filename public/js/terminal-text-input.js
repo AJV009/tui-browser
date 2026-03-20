@@ -8,6 +8,7 @@
 
 const TerminalTextInput = (() => {
   let _term = null;
+  let _ensureConnected = null;
 
   const panel = () => document.getElementById('text-input-panel');
   const textarea = () => document.getElementById('text-input-area');
@@ -15,8 +16,9 @@ const TerminalTextInput = (() => {
   const toggleBtn = () => document.getElementById('text-input-toggle');
   const penBtn = () => document.getElementById('qk-text-input');
 
-  function init({ term }) {
+  function init({ term, ensureConnected }) {
     _term = term;
+    _ensureConnected = ensureConnected;
 
     // Auto-open quickbar on mobile
     if (window.matchMedia('(max-width: 768px)').matches) {
@@ -104,17 +106,22 @@ const TerminalTextInput = (() => {
     panel().classList.toggle('text-input-fullscreen');
   }
 
-  function sendText() {
+  async function sendText() {
     const ta = textarea();
     const text = ta.value;
     if (!text) return;
-    if (_term) _term.input(text, true);
-    ta.value = '';
-    resetTextareaHeight();
-    if (!panel().classList.contains('text-input-fullscreen')) {
-      closePanel();
-    } else {
-      ta.focus();
+    try {
+      if (_ensureConnected) await _ensureConnected();
+      if (_term) _term.input(text, true);
+      ta.value = '';
+      resetTextareaHeight();
+      if (!panel().classList.contains('text-input-fullscreen')) {
+        closePanel();
+      } else {
+        ta.focus();
+      }
+    } catch {
+      App.showToast('Disconnected — try again');
     }
   }
 
