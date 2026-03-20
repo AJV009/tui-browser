@@ -37,7 +37,7 @@ const DashboardShortcuts = (() => {
       close();
       if (item.dataset.action === 'custom') { showCustomCommandPopup(); return; }
       const idx = parseInt(item.dataset.shortcutIdx, 10);
-      if (shortcutsData[idx]) launch(shortcutsData[idx]);
+      if (shortcutsData[idx]) prefill(shortcutsData[idx]);
     });
   }
 
@@ -107,8 +107,8 @@ const DashboardShortcuts = (() => {
           shortcutsData = data.shortcuts;
           rebuildMenu();
         }
-      } catch { /* save failed, still launch */ }
-      launch({ label, command: cmd });
+      } catch { /* save failed, still prefill */ }
+      prefill({ label, command: cmd });
     }
 
     function onCancel() { cleanup(); }
@@ -116,24 +116,12 @@ const DashboardShortcuts = (() => {
     cancelBtn.addEventListener('click', onCancel);
   }
 
-  async function launch(shortcut) {
+  function prefill(shortcut) {
     const base = shortcut.label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
     const name = base + '-' + Date.now().toString(36).slice(-4);
-    try {
-      const res = await fetch('/api/sessions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, command: shortcut.command }),
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        await App.showModal(err.error || 'Failed to launch shortcut', 'OK');
-        return;
-      }
-      _deps.connectTo(name);
-    } catch (err) {
-      await App.showModal('Failed to launch shortcut: ' + err.message, 'OK');
-    }
+    document.getElementById('new-session-name').value = name;
+    document.getElementById('new-session-cmd').value = shortcut.command;
+    document.getElementById('new-session-cmd').focus();
   }
 
   return { init };

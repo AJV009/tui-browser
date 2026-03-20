@@ -48,7 +48,7 @@ const TerminalTextInput = (() => {
       e.preventDefault(); closePanel();
     });
 
-    textarea().addEventListener('input', autoResize);
+    textarea().addEventListener('input', () => { autoResize(); updateSendIcon(); });
     textarea().addEventListener('keydown', handleKeyDown);
   }
 
@@ -88,6 +88,7 @@ const TerminalTextInput = (() => {
     penBtn().classList.add('active');
     textarea().value = '';
     resetTextareaHeight();
+    updateSendIcon();
     refitTerminal();
     textarea().focus();
   }
@@ -109,20 +110,31 @@ const TerminalTextInput = (() => {
   async function sendText() {
     const ta = textarea();
     const text = ta.value;
-    if (!text) return;
     try {
       if (_ensureConnected) await _ensureConnected();
+      if (!text) {
+        // Empty textarea — send Enter key
+        if (_term) _term.input('\r', true);
+        return;
+      }
       if (_term) _term.input(text, true);
       ta.value = '';
       resetTextareaHeight();
-      if (!panel().classList.contains('text-input-fullscreen')) {
-        closePanel();
-      } else {
-        ta.focus();
-      }
+      updateSendIcon();
+      ta.focus();
     } catch {
       App.showToast('Disconnected — try again');
     }
+  }
+
+  const ICON_SEND = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 12V4M4.5 7.5L8 4l3.5 3.5"/></svg>';
+  const ICON_ENTER = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 3v6a2 2 0 0 1-2 2H4M6.5 8.5L4 11l2.5 2.5"/></svg>';
+
+  function updateSendIcon() {
+    const btn = document.getElementById('text-input-send');
+    const hasText = textarea().value.length > 0;
+    btn.innerHTML = hasText ? ICON_SEND : ICON_ENTER;
+    btn.title = hasText ? 'Send' : 'Enter';
   }
 
   function autoResize() {
