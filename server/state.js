@@ -1,13 +1,16 @@
 /**
- * state.js — Persistent server state (display titles, locked sessions).
+ * state.js — Persistent server state (display titles, locked sessions, idle expiry).
  * Shared across routes and AI title modules.
  */
 
 const fs = require('fs');
 const path = require('path');
+const { execFile } = require('child_process');
 
 const dataDir = path.join(__dirname, '..', 'data');
 fs.mkdirSync(dataDir, { recursive: true });
+
+const IDLE_EXPIRY_MS = 24 * 60 * 60 * 1000; // 1 day
 
 // Display titles: tmuxName → { title, manuallyRenamed, lastGenAt, lastLineCount }
 const displayTitles = new Map();
@@ -37,18 +40,74 @@ function saveLocks() {
   } catch { /* ignore */ }
 }
 
+// Idle expiry: tmuxName → expiresAt (epoch ms). Tracks when idle sessions will be auto-killed.
+const idleExpiry = new Map();
+const expiryPath = path.join(dataDir, 'idle-expiry.json');
+try {
+  const saved = JSON.parse(fs.readFileSync(expiryPath, 'utf8'));
+  for (const [k, v] of Object.entries(saved)) idleExpiry.set(k, v);
+} catch { /* no saved expiry */ }
+
+function saveExpiry() {
+  try {
+    fs.writeFileSync(expiryPath, JSON.stringify(Object.fromEntries(idleExpiry), null, 2));
+  } catch { /* ignore */ }
+}
+
 // Shell names for bulk-kill "no running commands" filter
 const SHELL_NAMES = new Set(['bash', 'zsh', 'sh', 'fish', 'dash', 'ksh', 'csh', 'tcsh', 'nu', 'pwsh', 'login']);
 
-// Annotate session list with web client count, display title, and lock status
+// Annotate session list with web client count, display title, lock status, and expiry
 function annotateSessions(sessionList, getClientCount) {
+  const activeNames = new Set();
+  let expiryChanged = false;
+
   for (const s of sessionList) {
+    activeNames.add(s.name);
     s.webClients = getClientCount(s.name);
     const dt = displayTitles.get(s.name);
     if (dt && dt.title) s.displayTitle = dt.title;
     s.locked = lockedSessions.has(s.name);
+
+    // Determine if session is idle: detached, no web clients, only shells, not locked
+    const isIdle = s.attached === 0
+      && (s.webClients || 0) === 0
+      && !s.locked
+      && s.panes && s.panes.every(p => SHELL_NAMES.has(p.command));
+
+    if (isIdle) {
+      if (!idleExpiry.has(s.name)) {
+        idleExpiry.set(s.name, Date.now() + IDLE_EXPIRY_MS);
+        expiryChanged = true;
+      }
+      s.expiresAt = idleExpiry.get(s.name);
+    } else if (idleExpiry.has(s.name)) {
+      idleExpiry.delete(s.name);
+      expiryChanged = true;
+    }
   }
+
+  // Clean up expiry entries for sessions that no longer exist
+  for (const name of [...idleExpiry.keys()]) {
+    if (!activeNames.has(name)) { idleExpiry.delete(name); expiryChanged = true; }
+  }
+
+  if (expiryChanged) saveExpiry();
 }
+
+// Auto-kill expired idle sessions (checks every 5 minutes)
+setInterval(() => {
+  const now = Date.now();
+  let changed = false;
+  for (const [name, expiresAt] of [...idleExpiry.entries()]) {
+    if (expiresAt > now) continue;
+    execFile('tmux', ['kill-session', '-t', name], { timeout: 5000 }, () => {});
+    idleExpiry.delete(name);
+    displayTitles.delete(name);
+    changed = true;
+  }
+  if (changed) { saveExpiry(); saveTitles(); }
+}, 5 * 60 * 1000);
 
 module.exports = {
   displayTitles,

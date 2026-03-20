@@ -142,12 +142,24 @@ const Dashboard = (() => {
     const label = s.displayTitle || s.name;
     const isSel = selectedSessions.has(s.name), isLocked = s.locked;
 
+    let expiryHtml = '';
+    if (s.expiresAt) {
+      const d = new Date(s.expiresAt);
+      const dd = String(d.getDate()).padStart(2, '0');
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const yy = String(d.getFullYear()).slice(-2);
+      const hh = String(d.getHours()).padStart(2, '0');
+      const mi = String(d.getMinutes()).padStart(2, '0');
+      expiryHtml = `<div class="session-expiry">Exp: ${dd}-${mm}-${yy},${hh}:${mi}</div>`;
+    }
+
     return `<div class="session-card${hasKitty ? ' kitty-card' : ''}${isSel ? ' session-selected' : ''}${isLocked ? ' session-locked' : ''}" data-session="${esc(s.name)}">
         <div class="select-circle${isSel ? ' selected' : ''}" data-action="toggle-select" data-session="${esc(s.name)}"></div>
         <div class="lock-toggle${isLocked ? ' locked' : ''}" data-action="toggle-lock" data-session="${esc(s.name)}" title="${isLocked ? 'Unlock' : 'Lock'}">${isLocked ? ICON.lock : ICON.unlock}</div>
         <div class="session-card-header"><span class="session-name">${esc(label)}</span><span class="session-status">${hasKitty ? '<span class="source-badge kitty-badge">Kitty</span>' : ''}<span class="status-dot ${statusClass}"></span>${statusLabel}</span></div>
         ${kittyBadge}
         <div class="session-meta"><span>${esc(cmd)}</span><span>${created}</span>${paneTitle ? `<span>${esc(paneTitle)}</span>` : ''}</div>
+        ${expiryHtml}
         <div class="session-actions">
           <button class="btn btn-primary btn-icon" data-action="connect" data-session="${esc(s.name)}" title="Connect">${ICON.connect}</button>
           <button class="btn btn-secondary btn-icon" data-action="open-terminal" data-session="${esc(s.name)}" title="Open on PC">${ICON.monitor}</button>
