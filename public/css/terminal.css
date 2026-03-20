@@ -204,10 +204,10 @@
 }
 
 .keyboard-pill-btn {
-  width: 32px; height: 32px; border: none; background: transparent; color: var(--text);
+  width: 32px; height: 32px; border: none; background: var(--danger-dim); color: var(--danger);
   cursor: pointer; display: flex; align-items: center; justify-content: center;
   touch-action: manipulation; -webkit-tap-highlight-color: transparent;
-  user-select: none; transition: background 0.1s;
+  user-select: none; transition: background 0.1s, color 0.1s;
 }
 
 .keyboard-pill-btn:active { background: var(--accent-dim); color: var(--accent); }
