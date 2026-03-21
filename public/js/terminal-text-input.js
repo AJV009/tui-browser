@@ -2,13 +2,17 @@
  * terminal-text-input.js — Compose-and-send text panel for reliable mobile input.
  * Also manages quickbar visibility on non-mobile (toggle via scroll-controls pill).
  * On mobile the quickbar is always visible; the pen button in it opens the text panel.
+ * Drafts auto-save to server; sent text is recorded in per-session history.
  */
 
-/* global TerminalControls */
+/* global TerminalControls, TerminalNotes */
 
 const TerminalTextInput = (() => {
   let _term = null;
   let _ensureConnected = null;
+  let _sessionName = null;
+  let _draftTimer = null;
+  let _lastSavedDraft = '';
 
   const panel = () => document.getElementById('text-input-panel');
   const textarea = () => document.getElementById('text-input-area');
@@ -16,9 +20,13 @@ const TerminalTextInput = (() => {
   const toggleBtn = () => document.getElementById('text-input-toggle');
   const penBtn = () => document.getElementById('qk-text-input');
 
-  function init({ term, ensureConnected }) {
+  function init({ term, ensureConnected, sessionName }) {
     _term = term;
     _ensureConnected = ensureConnected;
+    _sessionName = sessionName;
+
+    // Init notes panel
+    TerminalNotes.init({ sessionName, loadIntoTextarea });
 
     // Auto-open quickbar on mobile
     if (window.matchMedia('(max-width: 768px)').matches) {
@@ -48,8 +56,60 @@ const TerminalTextInput = (() => {
       e.preventDefault(); closePanel();
     });
 
-    textarea().addEventListener('input', () => { autoResize(); updateSendIcon(); });
+    textarea().addEventListener('input', () => { autoResize(); updateSendIcon(); scheduleDraftSave(); });
     textarea().addEventListener('keydown', handleKeyDown);
+  }
+
+  // ---------- Session management ----------
+
+  function setSession(sessionName) {
+    _sessionName = sessionName;
+    TerminalNotes.setSession(sessionName);
+  }
+
+  // ---------- Draft auto-save ----------
+
+  function scheduleDraftSave() {
+    if (_draftTimer) clearTimeout(_draftTimer);
+    _draftTimer = setTimeout(saveDraft, 1000);
+  }
+
+  async function saveDraft() {
+    const text = textarea().value;
+    if (text === _lastSavedDraft || !_sessionName) return;
+    _lastSavedDraft = text;
+    try {
+      await fetch(`/api/sessions/${encodeURIComponent(_sessionName)}/draft`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      });
+    } catch { /* ignore */ }
+  }
+
+  async function restoreDraft() {
+    if (!_sessionName) return;
+    try {
+      const res = await fetch(`/api/sessions/${encodeURIComponent(_sessionName)}/input-history`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.draft) {
+        textarea().value = data.draft;
+        _lastSavedDraft = data.draft;
+        autoResize();
+        updateSendIcon();
+      }
+    } catch { /* ignore */ }
+  }
+
+  // ---------- Load text from notes/history ----------
+
+  function loadIntoTextarea(text) {
+    textarea().value = text;
+    autoResize();
+    updateSendIcon();
+    scheduleDraftSave();
+    textarea().focus();
   }
 
   // ---------- Quickbar toggle (desktop) ----------
@@ -77,7 +137,7 @@ const TerminalTextInput = (() => {
     requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
   }
 
-  function openPanel() {
+  async function openPanel() {
     // Close text-select overlay if open
     const overlay = document.getElementById('text-select-overlay');
     if (overlay && !overlay.classList.contains('hidden')) {
@@ -86,8 +146,10 @@ const TerminalTextInput = (() => {
 
     panel().classList.remove('hidden');
     penBtn().classList.add('active');
-    textarea().value = '';
-    resetTextareaHeight();
+
+    // Restore draft instead of clearing
+    await restoreDraft();
+    autoResize();
     updateSendIcon();
     refitTerminal();
     textarea().focus();
@@ -95,6 +157,9 @@ const TerminalTextInput = (() => {
 
   function closePanel() {
     if (panel().classList.contains('hidden')) return;
+    // Save draft before closing
+    saveDraft();
+    TerminalNotes.closeHistory();
     panel().classList.add('hidden');
     panel().classList.remove('text-input-fullscreen');
     penBtn().classList.remove('active');
@@ -118,7 +183,18 @@ const TerminalTextInput = (() => {
         return;
       }
       if (_term) _term.input(text, true);
+
+      // Save to history
+      if (_sessionName) {
+        fetch(`/api/sessions/${encodeURIComponent(_sessionName)}/input-history`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text }),
+        }).catch(() => {});
+      }
+
       ta.value = '';
+      _lastSavedDraft = '';
       resetTextareaHeight();
       updateSendIcon();
       ta.focus();
@@ -161,5 +237,5 @@ const TerminalTextInput = (() => {
     }
   }
 
-  return { init, close: closePanel };
+  return { init, close: closePanel, setSession };
 })();
