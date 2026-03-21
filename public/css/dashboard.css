@@ -85,8 +85,23 @@
 .shortcuts-menu .shortcut-item:hover,
 .shortcuts-menu .shortcut-item:active { background: var(--surface-hover); }
 
+.shortcut-item-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .shortcut-label { font-family: var(--mono); font-size: 13px; font-weight: 600; color: var(--text); }
 .shortcut-cmd { font-family: var(--mono); font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.shortcut-edit-btn {
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  line-height: 0;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s, background 0.15s;
+}
+.shortcut-item:hover .shortcut-edit-btn { opacity: 1; }
+.shortcut-edit-btn:hover { color: var(--accent); background: var(--surface); }
 .shortcut-custom { border-top: 1px solid var(--border-hover); }
 .shortcut-custom .shortcut-label { color: var(--accent); }
 
@@ -275,4 +290,5 @@
   .shortcuts-menu .shortcut-item { padding: 16px 20px; gap: 4px; min-height: 56px; justify-content: center; }
   .shortcuts-menu .shortcut-label { font-size: 15px; }
   .shortcuts-menu .shortcut-cmd { font-size: 12px; }
+  .shortcut-edit-btn { opacity: 1; padding: 8px; }
 }

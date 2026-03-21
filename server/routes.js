@@ -191,6 +191,28 @@ function setup(app, { discovery, sessions, kittyDiscovery, state, aiTitles, conf
     res.json({ shortcuts });
   }));
 
+  app.put('/api/shortcuts/:index', apiHandler(async (req, res) => {
+    const idx = parseInt(req.params.index, 10);
+    const { label, command } = req.body || {};
+    if (!label || !command) return res.status(400).json({ error: 'label and command required' });
+    let shortcuts = [];
+    try { shortcuts = JSON.parse(fs.readFileSync(shortcutsPath, 'utf8')); } catch { /* empty */ }
+    if (idx < 0 || idx >= shortcuts.length) return res.status(404).json({ error: 'shortcut not found' });
+    shortcuts[idx] = { label, command };
+    fs.writeFileSync(shortcutsPath, JSON.stringify(shortcuts, null, 2));
+    res.json({ shortcuts });
+  }));
+
+  app.delete('/api/shortcuts/:index', apiHandler(async (req, res) => {
+    const idx = parseInt(req.params.index, 10);
+    let shortcuts = [];
+    try { shortcuts = JSON.parse(fs.readFileSync(shortcutsPath, 'utf8')); } catch { /* empty */ }
+    if (idx < 0 || idx >= shortcuts.length) return res.status(404).json({ error: 'shortcut not found' });
+    shortcuts.splice(idx, 1);
+    fs.writeFileSync(shortcutsPath, JSON.stringify(shortcuts, null, 2));
+    res.json({ shortcuts });
+  }));
+
   app.post('/api/sessions/:name/generate-title', apiHandler(async (req, res) => {
     res.json(await aiTitles.generateTitle(req.params.name, state, true));
   }));
