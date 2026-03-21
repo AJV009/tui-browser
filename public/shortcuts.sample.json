@@ -1,0 +1,4 @@
+[
+  { "label": "Dev Server", "command": "cd ~/project && npm start" },
+  { "label": "System Monitor", "command": "htop" }
+]

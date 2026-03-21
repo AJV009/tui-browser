@@ -179,6 +179,10 @@ function setup(app, { discovery, sessions, kittyDiscovery, state, aiTitles, conf
   // ---------- Shortcuts / Titles / Rename / Lock ----------
 
   const shortcutsPath = path.join(__dirname, '..', 'public', 'shortcuts.json');
+  const shortcutsSamplePath = path.join(__dirname, '..', 'public', 'shortcuts.sample.json');
+  if (!fs.existsSync(shortcutsPath) && fs.existsSync(shortcutsSamplePath)) {
+    fs.copyFileSync(shortcutsSamplePath, shortcutsPath);
+  }
 
   app.post('/api/shortcuts', apiHandler(async (req, res) => {
     const { label, command } = req.body || {};
@@ -236,6 +240,85 @@ function setup(app, { discovery, sessions, kittyDiscovery, state, aiTitles, conf
     else lockedSessions.add(name);
     saveLocks();
     res.json({ locked: lockedSessions.has(name) });
+  }));
+
+  // ---------- Notes & Input History ----------
+
+  const dataDir = path.join(__dirname, '..', 'data');
+  const notesPath = path.join(dataDir, 'notes.json');
+  const historyPath = path.join(dataDir, 'input-history.json');
+
+  function readJSON(p, fallback) {
+    try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return fallback; }
+  }
+  function writeJSON(p, data) {
+    fs.mkdirSync(path.dirname(p), { recursive: true });
+    fs.writeFileSync(p, JSON.stringify(data, null, 2));
+  }
+
+  // --- Notes (global scratchpad) ---
+
+  app.get('/api/notes', apiHandler(async (req, res) => {
+    res.json(readJSON(notesPath, []));
+  }));
+
+  app.post('/api/notes', apiHandler(async (req, res) => {
+    const { text } = req.body || {};
+    if (!text || !text.trim()) return res.status(400).json({ error: 'text required' });
+    const notes = readJSON(notesPath, []);
+    const note = { id: Date.now().toString(36), text: text.trim(), createdAt: Date.now() };
+    notes.unshift(note);
+    writeJSON(notesPath, notes);
+    res.json(notes);
+  }));
+
+  app.put('/api/notes/:id', apiHandler(async (req, res) => {
+    const { text } = req.body || {};
+    if (!text || !text.trim()) return res.status(400).json({ error: 'text required' });
+    const notes = readJSON(notesPath, []);
+    const note = notes.find(n => n.id === req.params.id);
+    if (!note) return res.status(404).json({ error: 'note not found' });
+    note.text = text.trim();
+    note.updatedAt = Date.now();
+    writeJSON(notesPath, notes);
+    res.json(notes);
+  }));
+
+  app.delete('/api/notes/:id', apiHandler(async (req, res) => {
+    let notes = readJSON(notesPath, []);
+    notes = notes.filter(n => n.id !== req.params.id);
+    writeJSON(notesPath, notes);
+    res.json(notes);
+  }));
+
+  // --- Input History (per-session sent texts) ---
+
+  app.get('/api/sessions/:name/input-history', apiHandler(async (req, res) => {
+    const all = readJSON(historyPath, {});
+    const session = all[req.params.name] || { entries: [], draft: '' };
+    res.json(session);
+  }));
+
+  app.post('/api/sessions/:name/input-history', apiHandler(async (req, res) => {
+    const { text } = req.body || {};
+    if (!text || !text.trim()) return res.status(400).json({ error: 'text required' });
+    const all = readJSON(historyPath, {});
+    if (!all[req.params.name]) all[req.params.name] = { entries: [], draft: '' };
+    const session = all[req.params.name];
+    session.entries.unshift({ text: text.trim(), sentAt: Date.now() });
+    if (session.entries.length > 100) session.entries.length = 100;
+    session.draft = '';
+    writeJSON(historyPath, all);
+    res.json(session);
+  }));
+
+  app.put('/api/sessions/:name/draft', apiHandler(async (req, res) => {
+    const { text } = req.body || {};
+    const all = readJSON(historyPath, {});
+    if (!all[req.params.name]) all[req.params.name] = { entries: [], draft: '' };
+    all[req.params.name].draft = (text || '').slice(0, 10000);
+    writeJSON(historyPath, all);
+    res.json({ ok: true });
   }));
 }
 

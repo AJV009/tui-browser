@@ -195,7 +195,7 @@ const TerminalView = (() => {
       ensureConnected,
     });
 
-    TerminalTextInput.init({ term, ensureConnected });
+    TerminalTextInput.init({ term, ensureConnected, sessionName: null });
 
     updateZoomLabel();
   }
@@ -209,6 +209,7 @@ const TerminalView = (() => {
     if (ws) { ws.onclose = null; ws.onerror = null; ws.close(); ws = null; }
 
     currentSession = sessionName;
+    TerminalTextInput.setSession(sessionName);
     setStatus('connecting', 'Connecting\u2026');
     term.clear();
 
@@ -299,6 +300,7 @@ const TerminalView = (() => {
     TerminalControls.stopScrolling();
     TerminalControls.exitScrollMode();
     TerminalTextInput.close();
+    TerminalNotes.closeNotes();
     hideClaudeRemote();
     if (ws) { ws.onclose = null; ws.close(); ws = null; }
     currentSession = null;
