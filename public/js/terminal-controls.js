@@ -279,10 +279,19 @@ const TerminalControls = (() => {
     TerminalTextInput.close();
     const buf = _term.buffer.active;
     let lines = [];
+    let current = '';
     for (let i = 0; i < buf.length; i++) {
       const line = buf.getLine(i);
-      if (line) lines.push(line.translateToString(true));
+      if (!line) continue;
+      if (line.isWrapped) {
+        // Soft-wrapped continuation — join to previous line (trim trailing spaces from padding)
+        current = current.replace(/\s+$/, '') + line.translateToString(true);
+      } else {
+        if (i > 0) lines.push(current);
+        current = line.translateToString(true);
+      }
     }
+    lines.push(current);
     while (lines.length && lines[lines.length - 1].trim() === '') lines.pop();
     document.getElementById('text-select-content').textContent = lines.join('\n');
     document.getElementById('text-select-overlay').classList.remove('hidden');
