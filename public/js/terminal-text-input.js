@@ -5,7 +5,7 @@
  * Drafts auto-save to server; sent text is recorded in per-session history.
  */
 
-/* global TerminalControls, TerminalNotes */
+/* global App, TerminalControls, TerminalNotes */
 
 const TerminalTextInput = (() => {
   let _term = null;
@@ -146,6 +146,7 @@ const TerminalTextInput = (() => {
 
     panel().classList.remove('hidden');
     penBtn().classList.add('active');
+    App.pushOverlay('text-input', closePanel);
 
     // Restore draft instead of clearing
     await restoreDraft();
@@ -157,6 +158,11 @@ const TerminalTextInput = (() => {
 
   function closePanel() {
     if (panel().classList.contains('hidden')) return;
+    App.popOverlay('text-input');
+    // If fullscreen is active, pop that too
+    if (panel().classList.contains('text-input-fullscreen')) {
+      App.popOverlay('text-input-fullscreen');
+    }
     // Save draft before closing
     saveDraft();
     TerminalNotes.closeHistory();
@@ -169,7 +175,15 @@ const TerminalTextInput = (() => {
   }
 
   function toggleExpand() {
-    panel().classList.toggle('text-input-fullscreen');
+    if (panel().classList.contains('text-input-fullscreen')) {
+      App.popOverlay('text-input-fullscreen');
+      panel().classList.remove('text-input-fullscreen');
+    } else {
+      panel().classList.add('text-input-fullscreen');
+      App.pushOverlay('text-input-fullscreen', () => {
+        panel().classList.remove('text-input-fullscreen');
+      });
+    }
   }
 
   async function sendText() {

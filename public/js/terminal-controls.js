@@ -295,9 +295,12 @@ const TerminalControls = (() => {
     while (lines.length && lines[lines.length - 1].trim() === '') lines.pop();
     document.getElementById('text-select-content').textContent = lines.join('\n');
     document.getElementById('text-select-overlay').classList.remove('hidden');
+    App.pushOverlay('text-select', closeTextSelect);
   }
 
   function closeTextSelect() {
+    if (document.getElementById('text-select-overlay').classList.contains('hidden')) return;
+    App.popOverlay('text-select');
     document.getElementById('text-select-overlay').classList.add('hidden');
     if (_term) _term.focus();
   }

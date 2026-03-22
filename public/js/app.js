@@ -48,6 +48,7 @@ const App = (() => {
       currentSession = null;
       views.dashboard().classList.remove('hidden');
       backBtn.style.display = 'none';
+      clearOverlayStack();
       TerminalView.disconnect();
       Dashboard.refresh();
     }
@@ -155,10 +156,47 @@ const App = (() => {
     });
   }
 
+  // ---------- Overlay History Stack ----------
+
+  const overlayStack = [];
+  let overlayPopping = 0; // counter to eat popstate events from programmatic history.back()
+
+  function pushOverlay(name, closeFn) {
+    overlayStack.push({ name, closeFn });
+    history.pushState({ overlay: name }, '');
+  }
+
+  function popOverlay(name) {
+    const idx = overlayStack.findLastIndex(e => e.name === name);
+    if (idx === -1) return;
+    overlayStack.splice(idx, 1);
+    overlayPopping++;
+    history.back();
+  }
+
+  function clearOverlayStack() {
+    overlayStack.length = 0;
+  }
+
+  function handlePopState(e) {
+    if (overlayPopping > 0) {
+      overlayPopping--;
+      return;
+    }
+    // Back button pressed — check if we have an overlay to close
+    if (overlayStack.length > 0) {
+      const entry = overlayStack.pop();
+      entry.closeFn();
+      return;
+    }
+    // No overlay — let hashchange handle normal navigation
+  }
+
   // ---------- Init ----------
 
   function init() {
     window.addEventListener('hashchange', handleRoute);
+    window.addEventListener('popstate', handlePopState);
     document.getElementById('back-btn').addEventListener('click', () => navigate('dashboard'));
 
     Dashboard.init();
@@ -178,6 +216,7 @@ const App = (() => {
 
   return {
     init, navigate, showModal, showToast, getModalElements,
+    pushOverlay, popOverlay,
     getWsUrl: (...args) => AppNetwork.getWsUrl(...args),
     onNetworkChange: () => AppNetwork.onNetworkChange(),
     getCurrentSession: () => currentSession,
