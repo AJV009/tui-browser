@@ -115,6 +115,9 @@ set -g set-titles-string '#T'
 # Keep windows alive after process exit
 set -g remain-on-exit on
 
+# Cursor shape passthrough (blinking beam)
+set -ga terminal-overrides ',*:Ss=\E[%p1%d q:Se=\E[5 q'
+
 # Clipboard and events
 set -g set-clipboard on
 set -g focus-events on

@@ -35,12 +35,12 @@ const SHELLS = new Set(['zsh', 'bash', 'fish', 'sh', 'dash', 'tcsh', 'csh', 'ksh
 async function getProcessContext(sessionName) {
   const paneRaw = await run('tmux', [
     'list-panes', '-t', sessionName, '-F',
-    '#{pane_pid}|||#{pane_current_command}|||#{pane_active}',
+    '#{pane_pid}|||#{pane_current_command}|||#{pane_active}|||#{pane_title}',
   ]);
 
   const panes = paneRaw.split('\n').map((line) => {
-    const [pid, command, active] = line.split('|||');
-    return { pid: parseInt(pid, 10), command, active: active === '1' };
+    const [pid, command, active, paneTitle] = line.split('|||');
+    return { pid: parseInt(pid, 10), command, active: active === '1', paneTitle: paneTitle || '' };
   });
 
   const activePane = panes.find((p) => p.active) || panes[0];
@@ -48,6 +48,7 @@ async function getProcessContext(sessionName) {
 
   const panePid = activePane.pid;
   const foregroundCmd = activePane.command;
+  const paneTitle = activePane.paneTitle;
 
   // Claude Code session
   if (foregroundCmd === 'claude') {
@@ -59,14 +60,14 @@ async function getProcessContext(sessionName) {
     } catch {
       try { cwd = await fs.readlink(`/proc/${panePid}/cwd`); } catch { /* fallback below */ }
     }
-    return { isClaude: true, isShell: false, command: 'claude', cmdline: null, cwd: cwd || null };
+    return { isClaude: true, isShell: false, command: 'claude', cmdline: null, cwd: cwd || null, paneTitle };
   }
 
   // Bare shell — no interesting child process
   if (SHELLS.has(foregroundCmd)) {
     let cwd;
     try { cwd = await fs.readlink(`/proc/${panePid}/cwd`); } catch { /* ignore */ }
-    return { isClaude: false, isShell: true, command: foregroundCmd, cmdline: null, cwd: cwd || null };
+    return { isClaude: false, isShell: true, command: foregroundCmd, cmdline: null, cwd: cwd || null, paneTitle };
   }
 
   // Other process — find child and get full cmdline + cwd
@@ -84,10 +85,10 @@ async function getProcessContext(sessionName) {
   } catch { cmdline = foregroundCmd; }
   try { cwd = await fs.readlink(`/proc/${targetPid}/cwd`); } catch { /* ignore */ }
 
-  return { isClaude: false, isShell: false, command: foregroundCmd, cmdline, cwd: cwd || null };
+  return { isClaude: false, isShell: false, command: foregroundCmd, cmdline, cwd: cwd || null, paneTitle };
 }
 
-function runClaudeForTitle(cmdline, cwd) {
+function runClaudeForTitle(cmdline, cwd, paneTitle) {
   return new Promise((resolve, reject) => {
     const proc = spawn(claudePath, ['-p', '--model', 'haiku', '--no-session-persistence'], {
       timeout: 30000,
@@ -98,18 +99,20 @@ function runClaudeForTitle(cmdline, cwd) {
     proc.on('error', reject);
     proc.on('close', (code) => {
       if (code !== 0) return reject(new Error('claude exited with code ' + code));
-      const title = stdout.trim().replace(/^["']|["']$/g, '').replace(/\s+/g, '-').replace(/[.:]/g, '-').slice(0, 40);
+      const title = stdout.trim().replace(/^["']|["']$/g, '').replace(/\s+/g, '-').replace(/[.:]/g, '-').slice(0, 20);
       resolve(title);
     });
+    const paneTitleLine = paneTitle ? `\nApp-set title: ${paneTitle}` : '';
     proc.stdin.write(`Generate a concise terminal session title from this process info.
 Rules:
-- Maximum 30 characters
-- Format: "Action: Focus" (e.g. "Serve: TUI Browser", "Train: ML Model", "Edit: Config")
+- Maximum 20 characters
+- Format: "Action: Focus" (e.g. "Serve: TUI", "Train: ML", "Edit: Config")
 - Return ONLY the title text, nothing else
 - Base it on what the command is doing and the project context from the path
+- If an app-set title is provided, use it as extra context about what the process is doing
 
 Command: ${cmdline}
-Working directory: ${cwd}`);
+Working directory: ${cwd}${paneTitleLine}`);
     proc.stdin.end();
   });
 }
@@ -133,7 +136,7 @@ async function generateTitle(sessionName, state, force = false) {
     title = `Shell: ${dir}`;
   } else {
     if (!claudeAvailable) throw new Error('claude CLI not available');
-    title = await runClaudeForTitle(ctx.cmdline, ctx.cwd || 'unknown');
+    title = await runClaudeForTitle(ctx.cmdline, ctx.cwd || 'unknown', ctx.paneTitle);
     if (!title) throw new Error('empty title from claude');
   }
 
