@@ -140,6 +140,7 @@ const TerminalNotes = (() => {
   async function openNotes() {
     notesOverlay().classList.remove('hidden');
     document.getElementById('notes-toggle-btn').classList.add('active');
+    App.pushOverlay('notes', closeNotes);
     const hint = document.getElementById('notes-overlay-hint');
     hint.textContent = _loadIntoTextarea
       ? 'Tap a note to load it into the text editor'
@@ -150,6 +151,8 @@ const TerminalNotes = (() => {
   }
 
   function closeNotes() {
+    if (notesOverlay().classList.contains('hidden')) return;
+    App.popOverlay('notes');
     notesOverlay().classList.add('hidden');
     document.getElementById('notes-toggle-btn').classList.remove('active');
   }
