@@ -309,21 +309,6 @@
   flex: 1; overflow-y: auto; overscroll-behavior: contain;
 }
 
-/* ========== Notes Pill ========== */
-.notes-pill {
-  display: flex; flex-direction: column; align-items: center;
-  border: 1px solid var(--border-hover); border-radius: 6px;
-  background: var(--surface-hover); overflow: hidden;
-}
-.notes-pill-btn {
-  width: 32px; height: 32px; border: none; background: transparent; color: var(--text);
-  cursor: pointer; display: flex; align-items: center; justify-content: center;
-  touch-action: manipulation; -webkit-tap-highlight-color: transparent;
-  user-select: none; transition: background 0.1s;
-}
-.notes-pill-btn:active { background: var(--accent-dim); color: var(--accent); }
-.notes-pill-btn.active { background: var(--accent-dim); color: var(--accent); }
-
 /* ========== Shared Notes/History Styles ========== */
 .notes-empty {
   padding: 20px; text-align: center;
