@@ -101,19 +101,35 @@
       </div>
     </div>
     <div id="terminal-quickbar" class="terminal-quickbar">
-      <button class="qk" data-qk="esc">Esc</button>
-      <button class="qk" data-qk="tab">Tab</button>
-      <button class="qk" data-qk="shift-tab">^Tab</button>
-      <button class="qk" data-qk="enter">Enter</button>
-      <button class="qk" data-qk="ctrl-c">^C</button>
-      <button class="qk" data-qk="ctrl-d">^D</button>
-      <button class="qk" data-qk="ctrl-z">^Z</button>
-      <span class="qk-sep"></span>
-      <button class="qk" data-qk="up">&uarr;</button>
-      <button class="qk" data-qk="down">&darr;</button>
-      <button class="qk" data-qk="left">&larr;</button>
-      <button class="qk" data-qk="right">&rarr;</button>
-      <span class="qk-sep"></span>
+      <div class="qk-pages-area" id="qk-pages-area">
+        <button class="qk-arrow qk-arrow-left" id="qk-arrow-left" aria-label="Previous page">&lsaquo;</button>
+        <button class="qk-arrow qk-arrow-right" id="qk-arrow-right" aria-label="Next page">&rsaquo;</button>
+        <div class="qk-pages" id="qk-pages">
+          <div class="qk-page">
+            <button class="qk" data-qk="esc">Esc</button>
+            <button class="qk" data-qk="tab">Tab</button>
+            <button class="qk" data-qk="shift-tab">^Tab</button>
+            <button class="qk" data-qk="enter">Enter</button>
+          </div>
+          <div class="qk-page">
+            <button class="qk" data-qk="ctrl-c">^C</button>
+            <button class="qk" data-qk="ctrl-d">^D</button>
+            <button class="qk" data-qk="ctrl-z">^Z</button>
+          </div>
+          <div class="qk-page">
+            <button class="qk" data-qk="up">&uarr;</button>
+            <button class="qk" data-qk="down">&darr;</button>
+            <button class="qk" data-qk="left">&larr;</button>
+            <button class="qk" data-qk="right">&rarr;</button>
+          </div>
+        </div>
+        <div class="qk-dots" id="qk-dots">
+          <span class="qk-dot active" data-dot="0"></span>
+          <span class="qk-dot" data-dot="1"></span>
+          <span class="qk-dot" data-dot="2"></span>
+        </div>
+      </div>
+      <span class="qk-anchor-sep"></span>
       <button class="qk qk-accent" id="qk-select">Sel</button>
       <button class="qk qk-accent" id="qk-text-input" title="Text input"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11.5 1.5l3 3L5 14H2v-3z"/></svg></button>
     </div>

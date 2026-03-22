@@ -76,6 +76,34 @@ const TerminalView = (() => {
     term.loadAddon(fitAddon);
     term.open(document.getElementById('terminal-container'));
 
+    // Suppress browser right-click menu so tmux context menu is usable
+    document.getElementById('terminal-container').addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+    });
+
+    // Custom keyboard handler: Shift+Enter → CSI u sequence, Ctrl+Shift+V → paste
+    term.attachCustomKeyEventHandler((ev) => {
+      if (ev.type !== 'keydown') return true;
+
+      // Shift+Enter → send literal newline (matches Kitty's shift+enter → \n mapping)
+      if (ev.key === 'Enter' && ev.shiftKey && !ev.ctrlKey && !ev.altKey && !ev.metaKey) {
+        ev.preventDefault();
+        term.input('\n', true);
+        return false;
+      }
+
+      // Ctrl+Shift+V → paste from clipboard
+      if (ev.key === 'V' && ev.ctrlKey && ev.shiftKey && !ev.altKey && !ev.metaKey) {
+        ev.preventDefault();
+        navigator.clipboard.readText().then((text) => {
+          if (text) term.input(text, true);
+        }).catch(() => {});
+        return false;
+      }
+
+      return true;
+    });
+
     // Fix mobile keyboard input
     const xtermTextarea = document.querySelector('#terminal-container .xterm-helper-textarea');
     if (xtermTextarea) {
