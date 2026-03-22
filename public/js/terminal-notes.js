@@ -81,7 +81,12 @@ const TerminalNotes = (() => {
   const notesOverlay = () => document.getElementById('notes-overlay');
   const notesList = () => document.getElementById('notes-overlay-list');
 
+  let _notesInitialized = false;
+
   function initNotesOverlay() {
+    if (_notesInitialized) return;
+    _notesInitialized = true;
+
     document.getElementById('notes-toggle-btn').addEventListener('click', (e) => {
       e.preventDefault();
       toggleNotes();
@@ -100,7 +105,12 @@ const TerminalNotes = (() => {
     notesList().addEventListener('click', (e) => {
       const loadBtn = e.target.closest('[data-action="load"]');
       if (loadBtn) {
-        if (_loadIntoTextarea) _loadIntoTextarea(loadBtn.dataset.text);
+        const text = loadBtn.dataset.text;
+        if (_loadIntoTextarea) {
+          _loadIntoTextarea(text);
+        } else {
+          navigator.clipboard.writeText(text).catch(() => {});
+        }
         closeNotes();
         return;
       }
@@ -130,6 +140,10 @@ const TerminalNotes = (() => {
   async function openNotes() {
     notesOverlay().classList.remove('hidden');
     document.getElementById('notes-toggle-btn').classList.add('active');
+    const hint = document.getElementById('notes-overlay-hint');
+    hint.textContent = _loadIntoTextarea
+      ? 'Tap a note to load it into the text editor'
+      : 'Tap a note to copy it';
     await fetchNotes();
     renderNotes();
     document.getElementById('notes-add-input').focus();
@@ -273,5 +287,5 @@ const TerminalNotes = (() => {
     _sessionName = sessionName;
   }
 
-  return { init, setSession, closeHistory, closeNotes, isHistoryOpen, isNotesOpen };
+  return { init, initNotesOverlay, setSession, closeHistory, closeNotes, isHistoryOpen, isNotesOpen };
 })();

@@ -90,7 +90,7 @@ const TerminalControls = (() => {
 
     // Quick-keys bar
     const QK_MAP = {
-      'esc': '\x1b', 'tab': '\t',
+      'esc': '\x1b', 'tab': '\t', 'shift-tab': '\x1b[Z', 'enter': '\r',
       'ctrl-c': '\x03', 'ctrl-d': '\x04', 'ctrl-z': '\x1a',
       'up': '\x1b[A', 'down': '\x1b[B', 'left': '\x1b[D', 'right': '\x1b[C',
     };
@@ -138,12 +138,11 @@ const TerminalControls = (() => {
     bindScrollBtn(scrollUp, 'up');
     bindScrollBtn(scrollDown, 'down');
 
-    // Reset scroll mode from quickbar (Esc/Ctrl+C exit tmux copy-mode)
+    // Reset scroll UI when any quickbar key is tapped during scroll mode
+    // (the actual tmux copy-mode exit is handled by the key itself — Esc/Ctrl-C)
     document.getElementById('terminal-quickbar').addEventListener('touchstart', () => {
       if (inScrollMode) {
         stopScrolling();
-        const ws = _getWs();
-        if (ws && ws.readyState === WebSocket.OPEN) ws.send('q');
         exitScrollMode();
       }
     });

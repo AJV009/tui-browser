@@ -135,6 +135,7 @@
   padding: 14px 16px 14px 36px;
   transition: all 0.2s;
   position: relative;
+  min-width: 0; overflow: hidden;
 }
 
 .session-card:hover { border-color: var(--border-hover); background: var(--surface-raised); }
@@ -153,7 +154,7 @@
 }
 
 .session-meta span { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
-.session-meta span:last-child { flex-shrink: 1; overflow: hidden; text-overflow: ellipsis; }
+.session-meta span:last-child { flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .session-meta span + span::before { content: '|'; margin-right: 3px; color: var(--border-hover); }
 
 .session-preview {

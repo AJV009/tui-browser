@@ -163,6 +163,7 @@ const App = (() => {
 
     Dashboard.init();
     TerminalView.init();
+    TerminalNotes.initNotesOverlay();
     handleRoute();
     startVersionPolling();
     initConnectivityToasts();
