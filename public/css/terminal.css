@@ -176,7 +176,8 @@
 .text-select-content {
   flex: 1; overflow: auto; padding: 12px; margin: 0;
   font-family: var(--mono); font-size: 13px; line-height: 1.5; color: var(--text);
-  background: var(--bg); user-select: text; -webkit-user-select: text; white-space: pre-wrap; word-break: break-all;
+  background: var(--bg); user-select: text; -webkit-user-select: text;
+  white-space: pre; overflow: auto; touch-action: pan-x pan-y pinch-zoom;
 }
 
 /* ========== Text Input Pill ========== */
