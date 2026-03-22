@@ -110,10 +110,63 @@
 
 /* ========== Terminal Quick-Keys Bar ========== */
 .terminal-quickbar {
-  display: none; gap: 4px; padding: 5px 4px;
+  display: none; align-items: flex-start; gap: 6px; padding: 5px 4px;
   background: var(--surface); border-top: 1px solid var(--border); flex-shrink: 0;
 }
 
+.terminal-quickbar.quickbar-open { display: flex; }
+
+/* Paged area (swipeable left section) */
+.qk-pages-area {
+  flex: 1; min-width: 0; overflow: hidden; position: relative;
+}
+
+/* Desktop page arrows */
+.qk-arrow {
+  display: none; position: absolute; top: 0; z-index: 2;
+  width: 20px; height: 44px; border: none; cursor: pointer;
+  background: var(--surface); color: var(--text-dim);
+  font-size: 18px; font-weight: 700;
+  align-items: center; justify-content: center;
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+  opacity: 0.6; transition: opacity 0.15s;
+}
+
+.qk-arrow:hover { opacity: 1; color: var(--accent); }
+.qk-arrow-left { left: 0; }
+.qk-arrow-right { right: 0; }
+
+@media (pointer: fine) {
+  .qk-arrow { display: flex; }
+  .qk-pages-area { padding: 0 22px; }
+}
+
+.qk-pages {
+  display: flex; transition: transform 0.25s ease;
+}
+
+.qk-page {
+  min-width: 100%; display: flex; gap: 4px; padding: 0 2px; box-sizing: border-box;
+}
+
+/* Page indicator dots */
+.qk-dots {
+  display: flex; justify-content: center; gap: 6px; padding: 5px 0 1px;
+}
+
+.qk-dot {
+  width: 6px; height: 6px; border-radius: 50%; background: var(--border);
+  cursor: pointer; transition: background 0.2s; -webkit-tap-highlight-color: transparent;
+}
+
+.qk-dot.active { background: var(--accent); }
+
+/* Anchor separator */
+.qk-anchor-sep {
+  width: 1px; align-self: stretch; margin: 4px 0; background: var(--border); flex-shrink: 0;
+}
+
+/* Key buttons */
 .qk {
   flex: 1; height: 44px; border: 1px solid var(--border); border-radius: 6px;
   background: var(--surface-raised); color: var(--text-dim); font-family: var(--mono);
@@ -122,14 +175,8 @@
 }
 
 .qk:active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
-.qk-accent { background: var(--accent-dim); color: var(--accent); border-color: var(--accent-dim); }
+.qk-accent { background: var(--accent-dim); color: var(--accent); border-color: var(--accent-dim); flex: 0 0 44px; }
 .qk.active { background: var(--accent); color: var(--bg); border-color: var(--accent); }
-
-.terminal-quickbar.quickbar-open { display: flex; }
-
-.qk-sep {
-  width: 1px; align-self: stretch; margin: 8px 0; background: var(--border); flex-shrink: 0;
-}
 
 /* ========== Scroll Controls ========== */
 .scroll-controls {
@@ -383,6 +430,7 @@
   .terminal-toolbar { padding: 6px 10px; }
   .terminal-quickbar.quickbar-open { padding-bottom: max(5px, env(safe-area-inset-bottom)); }
   .qk { height: 46px; font-size: 15px; }
+  .qk-accent { flex: 0 0 46px; }
   .text-input-body textarea { font-size: 16px; }
   .sent-history-panel { max-height: 45vh; }
   .notes-item { padding: 12px 14px; min-height: 44px; }

@@ -95,9 +95,11 @@ const TerminalControls = (() => {
       'up': '\x1b[A', 'down': '\x1b[B', 'left': '\x1b[D', 'right': '\x1b[C',
     };
 
+    // Quickbar button taps — only handle anchored buttons (outside pages area)
     document.getElementById('terminal-quickbar').addEventListener('touchstart', async (e) => {
       const btn = e.target.closest('.qk');
       if (!btn) return;
+      if (btn.closest('.qk-pages-area')) return; // pages area handles its own buttons
       e.preventDefault();
       const seq = QK_MAP[btn.dataset.qk];
       if (!seq || !_term) return;
@@ -106,6 +108,80 @@ const TerminalControls = (() => {
         _term.input(seq, true);
       } catch { /* silently ignore for ephemeral keys */ }
     }, { passive: false });
+
+    // Quickbar paged swipe + dot navigation
+    const qkPagesArea = document.getElementById('qk-pages-area');
+    const qkPages = document.getElementById('qk-pages');
+    const qkDots = document.getElementById('qk-dots');
+    const totalPages = qkPages.children.length;
+    let qkCurrentPage = 0;
+    let qkSwipeStartX = null;
+    let qkSwipeDeltaX = 0;
+    let qkTouchedBtn = null;
+
+    function setQkPage(page) {
+      qkCurrentPage = Math.max(0, Math.min(totalPages - 1, page));
+      qkPages.style.transform = `translateX(-${qkCurrentPage * 100}%)`;
+      qkDots.querySelectorAll('.qk-dot').forEach((dot, i) => {
+        dot.classList.toggle('active', i === qkCurrentPage);
+      });
+    }
+
+    qkDots.addEventListener('click', (e) => {
+      const dot = e.target.closest('.qk-dot');
+      if (dot) setQkPage(Number(dot.dataset.dot));
+    });
+
+    // Desktop arrow buttons
+    document.getElementById('qk-arrow-left').addEventListener('click', () => setQkPage(qkCurrentPage - 1));
+    document.getElementById('qk-arrow-right').addEventListener('click', () => setQkPage(qkCurrentPage + 1));
+
+    // Pages area: always track swipe, decide tap vs swipe on touchend
+    qkPagesArea.addEventListener('touchstart', (e) => {
+      qkSwipeStartX = e.touches[0].clientX;
+      qkSwipeDeltaX = 0;
+      qkTouchedBtn = e.target.closest('.qk');
+      qkPages.style.transition = 'none';
+    }, { passive: true });
+
+    qkPagesArea.addEventListener('touchmove', (e) => {
+      if (qkSwipeStartX === null) return;
+      qkSwipeDeltaX = e.touches[0].clientX - qkSwipeStartX;
+      const pct = -qkCurrentPage * 100 + (qkSwipeDeltaX / qkPagesArea.offsetWidth) * 100;
+      qkPages.style.transform = `translateX(${pct}%)`;
+    }, { passive: true });
+
+    qkPagesArea.addEventListener('touchend', async () => {
+      if (qkSwipeStartX === null) return;
+      qkPages.style.transition = 'transform 0.25s ease';
+      const threshold = qkPagesArea.offsetWidth * 0.2;
+      if (qkSwipeDeltaX < -threshold) {
+        setQkPage(qkCurrentPage + 1);
+      } else if (qkSwipeDeltaX > threshold) {
+        setQkPage(qkCurrentPage - 1);
+      } else {
+        setQkPage(qkCurrentPage); // snap back
+        // Not a swipe — fire button tap if touched one and barely moved
+        if (qkTouchedBtn && Math.abs(qkSwipeDeltaX) < 10) {
+          const seq = QK_MAP[qkTouchedBtn.dataset.qk];
+          if (seq && _term) {
+            try {
+              if (_ensureConnected) await _ensureConnected();
+              _term.input(seq, true);
+            } catch { /* ignore */ }
+          }
+        }
+      }
+      qkSwipeStartX = null;
+      qkTouchedBtn = null;
+    });
+
+    qkPagesArea.addEventListener('touchcancel', () => {
+      qkPages.style.transition = 'transform 0.25s ease';
+      setQkPage(qkCurrentPage);
+      qkSwipeStartX = null;
+      qkTouchedBtn = null;
+    });
 
     // Text select overlay
     document.getElementById('qk-select').addEventListener('touchstart', (e) => { e.preventDefault(); openTextSelect(); }, { passive: false });
