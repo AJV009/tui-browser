@@ -315,15 +315,23 @@ const FileBrowser = (() => {
       </div>`
     ).join('');
 
-    // Position: centered horizontally, below the row (or above if near bottom)
-    const rect = row.getBoundingClientRect();
+    // Position at the long-press point, clamped to stay on screen
     const menuWidth = 200;
-    const menuHeight = actions.length * 44 + 8; // approx
-    let top = rect.bottom + 4;
-    if (top + menuHeight > window.innerHeight - 16) {
-      top = Math.max(16, rect.top - menuHeight - 4);
+    const menuHeight = actions.length * 44 + 8;
+    const px = e.clientX;
+    const py = e.clientY;
+    let top = py;
+    let left = px;
+    // Clamp: don't overflow bottom
+    if (top + menuHeight > window.innerHeight - 12) {
+      top = Math.max(12, py - menuHeight);
     }
-    const left = Math.max(16, (window.innerWidth - menuWidth) / 2);
+    // Clamp: don't overflow right
+    if (left + menuWidth > window.innerWidth - 12) {
+      left = window.innerWidth - menuWidth - 12;
+    }
+    // Clamp: don't overflow left
+    if (left < 12) left = 12;
     $contextMenu.style.top = top + 'px';
     $contextMenu.style.left = left + 'px';
     $contextMenu.style.right = 'auto';
