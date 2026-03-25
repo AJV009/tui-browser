@@ -39,6 +39,9 @@ function getAllowedRoots() {
 }
 
 async function validatePath(filePath) {
+  if (typeof filePath !== 'string' || !filePath) {
+    throw new Error('Path is required');
+  }
   const resolved = path.resolve(filePath);
   let real;
   try {
@@ -134,6 +137,9 @@ function setup(app) {
   // Write file contents
   app.post('/api/files/write', apiHandler(async (req, res) => {
     const filePath = await validatePath(req.body.path);
+    if (typeof req.body.content !== 'string') {
+      return res.status(400).json({ error: 'content must be a string' });
+    }
     await fs.writeFile(filePath, req.body.content, 'utf8');
     res.json({ success: true });
   }));
@@ -149,6 +155,10 @@ function setup(app) {
   app.post('/api/files/rename', apiHandler(async (req, res) => {
     const oldPath = await validatePath(req.body.oldPath);
     const newPath = await validatePath(req.body.newPath);
+    const roots = getAllowedRoots();
+    if (roots.includes(oldPath)) {
+      return res.status(403).json({ error: 'Cannot rename a root directory' });
+    }
     try {
       await fs.access(newPath);
       return res.status(409).json({ error: 'exists', existing: { name: path.basename(newPath) } });
@@ -160,6 +170,10 @@ function setup(app) {
   // Delete file or folder
   app.post('/api/files/delete', apiHandler(async (req, res) => {
     const filePath = await validatePath(req.body.path);
+    const roots = getAllowedRoots();
+    if (roots.includes(filePath)) {
+      return res.status(403).json({ error: 'Cannot delete a root directory' });
+    }
     const stat = await fs.stat(filePath);
     if (stat.isDirectory()) {
       await fs.rm(filePath, { recursive: true });
@@ -173,6 +187,10 @@ function setup(app) {
   app.post('/api/files/move', apiHandler(async (req, res) => {
     const src = await validatePath(req.body.src);
     const dest = await validatePath(req.body.dest);
+    const roots = getAllowedRoots();
+    if (roots.includes(src)) {
+      return res.status(403).json({ error: 'Cannot move a root directory' });
+    }
     if (!req.body.overwrite) {
       try {
         await fs.access(dest);
@@ -216,6 +234,7 @@ function setup(app) {
     destination: async (req, file, cb) => {
       try {
         const dir = await validatePath(req.body.targetDir || req.query.targetDir);
+        req._validatedDir = dir;
         cb(null, dir);
       } catch (err) {
         cb(err);
@@ -223,7 +242,7 @@ function setup(app) {
     },
     filename: (req, file, cb) => {
       // Handle conflicts: append (1), (2) etc.
-      const dir = req.body.targetDir || req.query.targetDir;
+      const dir = req._validatedDir;
       const resolve = (name, attempt) => {
         const full = path.join(dir, name);
         try {
