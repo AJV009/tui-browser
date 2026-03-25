@@ -37,6 +37,7 @@ Built for TUI-heavy workflows (Claude Code, OpenCode, Codex, htop, etc.) where y
 - **AI session titles** — uses Claude CLI (haiku) to auto-generate contextual session names from terminal output.
 - **Claude Code detection** — auto-detects Claude Code sessions and shows a Claude icon button when remote-control is active. Click to copy the URL, double-click to open it.
 - **Text input panel** — compose text and send it to the terminal in one shot (like paste), avoids mobile keystroke drops. Pen icon in the quick-keys bar.
+- **File browser** — session-aware file manager accessible from any view. Browse, view, edit, upload, and download files from your phone. Opens to the terminal session's working directory.
 - **Mobile-optimized** — quick-keys bar (toggleable on all screen sizes), scroll controls, text selection overlay, keyboard-aware viewport.
 
 ### Dashboard & Session Tools
@@ -50,6 +51,16 @@ Built for TUI-heavy workflows (Claude Code, OpenCode, Codex, htop, etc.) where y
 - **Font size controls** — zoom in/out on the terminal view with +/- buttons.
 - **Open on PC** — relaunch dangling sessions into a Kitty window from the dashboard.
 
+### File Browser
+
+- **Session-aware** — opens to the working directory of the current terminal session, or home directory from the dashboard.
+- **Browse & navigate** — Google Files-style UI with breadcrumb path, folder-first sorting, vscode-icons for 1,480+ file types.
+- **View & edit files** — CodeMirror 6 editor with syntax highlighting for 13 languages, read-only by default, tap Edit to modify and save.
+- **Upload files** — drag-and-drop (or file picker on mobile) via FilePond, with progress bars and multi-file support.
+- **Download files & folders** — single files download directly, folders download as zip archives.
+- **File management** — create folders, rename, delete, copy, move. Long-press for context menu, single-tap to select for bulk actions.
+- **Configurable access** — allowed directories set in `data/file-browser-config.json` (defaults to home directory). Path traversal prevention on all endpoints.
+
 ### Under the Hood
 
 - **Local network fast-path** — auto-switches between Cloudflare tunnel and direct LAN connection for lowest latency. Green house icon = local, orange globe = tunnel.
@@ -60,7 +71,7 @@ Built for TUI-heavy workflows (Claude Code, OpenCode, Codex, htop, etc.) where y
 - **Online/offline detection** — toast notifications for connectivity changes.
 - **Auto-restart** — systemd service with file watcher restarts the server on code changes.
 - **Cloudflare Tunnel support** — secure remote access via HTTPS with zero port forwarding.
-- **Zero build frontend** — vanilla JS, xterm.js from CDN, no bundler.
+- **Zero build frontend** — vanilla JS, xterm.js/FilePond from CDN, CodeMirror 6 + vscode-icons pre-bundled in `public/vendor/`.
 
 <table>
   <tr>
@@ -218,7 +229,7 @@ systemctl --user enable --now tui-browser-tunnel.service
 
 ## Security
 
-**This tool gives full shell access from a browser. Do not expose without authentication.**
+**This tool gives full shell access and filesystem access from a browser. Do not expose without authentication.**
 
 ### Recommended: Cloudflare Access (Zero Trust)
 
@@ -274,6 +285,18 @@ systemctl --user stop tui-browser-tunnel
 | `POST` | `/api/sessions/:name/generate-title` | AI-generate session title via Claude CLI |
 | `POST` | `/api/shortcuts` | Add custom shortcut `{ label, command }` |
 | `DELETE` | `/api/sessions/:name` | Kill session |
+| **File Browser** | | |
+| `POST` | `/api/files/list` | List directory contents `{ path, showHidden? }` |
+| `POST` | `/api/files/read` | Read text file `{ path }` — returns content or binary/size flag |
+| `POST` | `/api/files/write` | Save file `{ path, content }` |
+| `POST` | `/api/files/upload` | Upload files (multipart, field: `filepond`, query: `targetDir`) |
+| `GET` | `/api/files/download` | Download file or zip folder `?path=...` |
+| `POST` | `/api/files/mkdir` | Create directory `{ path }` (recursive, idempotent) |
+| `POST` | `/api/files/rename` | Rename `{ oldPath, newPath }` — 409 if target exists |
+| `POST` | `/api/files/delete` | Delete file/folder `{ path }` (recursive for dirs) |
+| `POST` | `/api/files/move` | Move `{ src, dest, overwrite? }` — 409 if exists |
+| `POST` | `/api/files/copy` | Copy `{ src, dest, overwrite? }` — 409 if exists |
+| `GET` | `/api/files/cwd` | Get tmux session CWD `?session=name` |
 
 ### WebSocket
 
@@ -303,6 +326,7 @@ tui-browser/
 │   ├── discovery.js          # tmux + unified discovery with PID matching
 │   ├── kitty-discovery.js    # Kitty remote control discovery
 │   ├── claude-detect.js      # Claude Code session + remote-control detection
+│   ├── file-routes.js        # File browser REST API (browse, edit, upload, download)
 │   └── exec-util.js          # Shared subprocess utility
 ├── public/
 │   ├── index.html            # SPA shell
@@ -315,14 +339,24 @@ tui-browser/
 │   │   ├── dashboard-info.js       # Session info overlay
 │   │   ├── terminal.js       # xterm.js setup + WebSocket connection
 │   │   ├── terminal-text-input.js  # Compose-and-send text panel + quickbar toggle
-│   │   └── terminal-controls.js    # Scroll, text select, session ops
+│   │   ├── terminal-controls.js    # Scroll, text select, session ops
+│   │   ├── file-browser.js         # File browser overlay (navigation, context menu, selection)
+│   │   ├── file-editor.js          # CodeMirror 6 file editor (view/edit text files)
+│   │   └── file-upload.js          # FilePond upload overlay
 │   └── css/
 │       ├── base.css           # Theme variables, header, buttons, modal
 │       ├── dashboard.css      # Session cards, toolbar, shortcuts
 │       ├── terminal.css       # Terminal view, quick-keys, scroll controls
-│       └── info-panel.css     # Session info overlay + stats
+│       ├── info-panel.css     # Session info overlay + stats
+│       └── file-browser.css  # File browser, editor, upload, context menu styles
+│   ├── vendor/
+│   │   ├── codemirror.bundle.js  # Pre-built CodeMirror 6 (13 languages)
+│   │   └── vscode-icons.js       # Pre-built vscode-icons browser bundle
+│   └── icons/                    # vscode-icons SVGs (1,480 file type icons, gitignored)
 ├── scripts/
-│   └── tmux-kitty-shell      # Wrapper: launches Kitty windows inside tmux
+│   ├── tmux-kitty-shell          # Wrapper: launches Kitty windows inside tmux
+│   ├── bundle-codemirror.sh      # One-time CodeMirror 6 build script
+│   └── bundle-vscode-icons.sh    # One-time vscode-icons build script
 ├── install.sh                # One-command setup
 └── package.json
 ```
