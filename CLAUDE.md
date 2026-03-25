@@ -45,6 +45,7 @@ There is no test suite, linter, or build step. Test API changes against the runn
 - **state.js** — Persistent state (display titles, locked sessions) saved to `data/` directory.
 - **ai-titles.js** — Auto-generates session titles via Claude CLI every 60s.
 - **exec-util.js** — Subprocess wrapper with 5s timeout used by all `execFile` calls.
+- **file-routes.js** — File browser REST API. All endpoints under `/api/files/*` — list, read, write, upload, download, mkdir, rename, delete, move, copy, cwd. Path traversal prevention via configurable allowed roots (`data/file-browser-config.json`).
 
 ### Frontend (`public/`)
 
@@ -59,6 +60,9 @@ Zero-build vanilla JS SPA. xterm.js loaded from CDN. Each JS file is a self-cont
 - **dashboard-info.js** — Session info overlay (memory, CPU, process tree)
 - **terminal.js** — xterm.js setup + WebSocket connection (binary terminal data)
 - **terminal-controls.js** — Scroll controls, text selection overlay, quick-keys bar, session rename/kill
+- **file-browser.js** — File browser overlay with Google Files-style navigation, breadcrumbs, vscode-icons, context menu, selection mode, directory picker
+- **file-editor.js** — CodeMirror 6 wrapper for viewing/editing text files with syntax highlighting
+- **file-upload.js** — FilePond wrapper for drag-and-drop file uploads
 
 ### Key Data Flow
 
@@ -72,8 +76,8 @@ Binary vs JSON distinguished by first byte: `charCodeAt(0) !== 123` (not `{`) me
 
 ## Key Conventions
 
-- **3 npm dependencies** (express, node-pty, ws) — keep it minimal
-- **No build step** — frontend served as static files, xterm.js from CDN
+- **6 npm dependencies** (express, node-pty, ws, multer, archiver, vscode-icons-js)
+- **No build step** — frontend served as static files, xterm.js/FilePond from CDN, CodeMirror 6 + vscode-icons pre-bundled in `public/vendor/`
 - **IIFE module pattern** — each frontend JS file is `const Module = (() => { ... })()`
 - **Data attributes for actions** — HTML uses `data-action="connect"`, `data-session="name"` patterns
 - **tmux format strings** use `|||` separator (not JSON) to parse session/pane metadata
