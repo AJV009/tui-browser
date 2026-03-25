@@ -6,6 +6,12 @@
 /* global App, FileEditor, FileUpload, getIconForFile, getIconForFolder */
 
 const FileBrowser = (() => {
+  function esc(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
   let _currentPath = '';
   let _history = [];
   let _selectionMode = false;
@@ -203,12 +209,12 @@ const FileBrowser = (() => {
         : `${formatSize(entry.size)} \u00b7 ${formatDate(entry.modified)}`;
       const isSelected = _selected.has(entry.name);
       return `
-        <div class="fb-file-row${isSelected ? ' selected' : ''}" data-name="${entry.name}" data-type="${entry.type}">
+        <div class="fb-file-row${isSelected ? ' selected' : ''}" data-name="${esc(entry.name)}" data-type="${entry.type}">
           ${_selectionMode ? `<div class="fb-checkbox${isSelected ? ' checked' : ''}">
             ${isSelected ? '\u2713' : ''}</div>` : ''}
           <img class="fb-file-icon" src="${iconUrl}" alt="" width="24" height="24">
           <div class="fb-file-info">
-            <div class="fb-file-name">${entry.name}</div>
+            <div class="fb-file-name">${esc(entry.name)}</div>
             <div class="fb-file-meta">${meta}</div>
           </div>
           <span class="fb-file-trail">${entry.type === 'directory' ? '\u203a' : '\u22ee'}</span>
@@ -564,9 +570,9 @@ const FileBrowser = (() => {
         const dirs = entries.filter(e => e.type === 'directory');
         const $list = document.getElementById('dp-dir-list');
         $list.innerHTML = dirs.map(d => `
-          <div class="fb-file-row" data-name="${d.name}" data-type="directory">
+          <div class="fb-file-row" data-name="${esc(d.name)}" data-type="directory">
             <img class="fb-file-icon" src="${getIconUrl(d)}" width="24" height="24">
-            <div class="fb-file-info"><div class="fb-file-name">${d.name}</div></div>
+            <div class="fb-file-info"><div class="fb-file-name">${esc(d.name)}</div></div>
             <span class="fb-file-trail">\u203a</span>
           </div>
         `).join('') || '<div class="fb-empty">No folders</div>';

@@ -241,21 +241,24 @@ function setup(app) {
       }
     },
     filename: (req, file, cb) => {
-      // Handle conflicts: append (1), (2) etc.
       const dir = req._validatedDir;
+      // Sanitize: only use basename, strip null bytes
+      const safeName = path.basename(file.originalname).replace(/\0/g, '');
+      if (!safeName) return cb(new Error('Invalid filename'));
+      // Handle conflicts: append (1), (2) etc.
       const resolve = (name, attempt) => {
         const full = path.join(dir, name);
         try {
           fsSync.accessSync(full);
           // File exists — generate new name
-          const ext = path.extname(file.originalname);
-          const base = path.basename(file.originalname, ext);
+          const ext = path.extname(safeName);
+          const base = path.basename(safeName, ext);
           return resolve(`${base} (${attempt})${ext}`, attempt + 1);
         } catch {
           return name;
         }
       };
-      cb(null, resolve(file.originalname, 1));
+      cb(null, resolve(safeName, 1));
     },
   });
   const upload = multer({ storage });

@@ -27,7 +27,7 @@ const FULL_VERSION = `${PKG_VERSION.replace(/\.\d+$/, '')}.${BUILD_ID}`;
 // ---------- Express Setup ----------
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '2mb' }));
 
 // CORS
 app.use((req, res, next) => {

@@ -126,11 +126,15 @@ const FileEditor = (() => {
     if (!_editorView) return;
     const content = _editorView.state.doc.toString();
     try {
-      await fetch('/api/files/write', {
+      const res = await fetch('/api/files/write', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ path: _filePath, content }),
       });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Save failed');
+      }
       _originalContent = content;
       $modified.classList.add('hidden');
       App.showToast('Saved', 'success', 2000);
