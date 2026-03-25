@@ -165,13 +165,13 @@ const Dashboard = (() => {
         <div class="session-card-header"><span class="session-name">${esc(label)}</span><span class="session-status">${hasKitty ? '<span class="source-badge kitty-badge">Kitty</span>' : ''}<span class="status-dot ${statusClass}"></span>${statusLabel}</span></div>
         ${kittyBadge}
         <div class="session-meta"><span>${esc(cmd)}</span><span>${created}</span>${paneTitle ? `<span>${esc(paneTitle)}</span>` : ''}</div>
-        ${expiryHtml}
         <div class="session-actions">
           <button class="btn btn-primary btn-icon" data-action="connect" data-session="${esc(s.name)}" title="Connect">${ICON.connect}</button>
           <button class="btn btn-secondary btn-icon" data-action="open-terminal" data-session="${esc(s.name)}" title="Open on PC">${ICON.monitor}</button>
           <button class="btn btn-secondary btn-icon" data-action="info" data-session="${esc(s.name)}" title="Session info">${ICON.info}</button>
           <button class="btn btn-danger btn-icon${isLocked ? ' btn-locked' : ''}" data-action="kill" data-session="${esc(s.name)}" title="${isLocked ? 'Locked' : 'Kill'}"${isLocked ? ' disabled' : ''}>${ICON.kill}</button>
-        </div></div>`;
+        </div>
+        ${expiryHtml}</div>`;
   }
 
   function renderUnmatchedKitty(windows) {
