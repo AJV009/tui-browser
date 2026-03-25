@@ -14,10 +14,9 @@ const FileBrowser = (() => {
 
   let _currentPath = '';
   let _history = [];
-  let _selectionMode = false;
   let _selected = new Set();
   let _entries = [];
-  let _sortBy = 'name';
+  let _sortBy = 'date';
   let _showHidden = false;
   let _contextTarget = null;
   let _originView = 'dashboard'; // 'dashboard' or 'terminal'
@@ -46,9 +45,8 @@ const FileBrowser = (() => {
     $selectionBar.addEventListener('click', handleSelectionAction);
     // Context menu backdrop
     $contextBackdrop.addEventListener('click', hideContextMenu);
-    // File list delegation
-    $fileList.addEventListener('click', handleFileClick);
-    // Long-press for context menu
+    // File list: single-click selects, double-click opens, long-press context menu
+    setupClickHandlers();
     setupLongPress();
 
     // DirPicker buttons (wired here, not in DOMContentLoaded — IIFE runs after DOM ready)
@@ -65,7 +63,6 @@ const FileBrowser = (() => {
     const targetPath = initialPath || await getDefaultPath();
     _currentPath = targetPath;
     _history = [];
-    _selectionMode = false;
     _selected.clear();
     $overlay.classList.remove('hidden');
     App.pushOverlay('file-browser', close);
@@ -76,7 +73,7 @@ const FileBrowser = (() => {
     if ($overlay.classList.contains('hidden')) return;
     $overlay.classList.add('hidden');
     App.popOverlay('file-browser');
-    exitSelectionMode();
+    clearSelection();
     hideContextMenu();
   }
 
@@ -147,7 +144,7 @@ const FileBrowser = (() => {
   async function navigateTo(dirPath) {
     _history.push(_currentPath);
     _currentPath = dirPath;
-    exitSelectionMode();
+    clearSelection();
     await refresh();
   }
 
@@ -210,8 +207,6 @@ const FileBrowser = (() => {
       const isSelected = _selected.has(entry.name);
       return `
         <div class="fb-file-row${isSelected ? ' selected' : ''}" data-name="${esc(entry.name)}" data-type="${entry.type}">
-          ${_selectionMode ? `<div class="fb-checkbox${isSelected ? ' checked' : ''}">
-            ${isSelected ? '\u2713' : ''}</div>` : ''}
           <img class="fb-file-icon" src="${iconUrl}" alt="" width="24" height="24">
           <div class="fb-file-info">
             <div class="fb-file-name">${esc(entry.name)}</div>
@@ -226,25 +221,49 @@ const FileBrowser = (() => {
       _sortBy === 'name' ? 'Sort \u2195' : _sortBy === 'date' ? 'Date \u2195' : 'Size \u2195';
   }
 
-  // ---------- File Click Handling ----------
+  // ---------- Click Handling: single=select, double=open, long=context ----------
 
-  function handleFileClick(e) {
-    const row = e.target.closest('.fb-file-row');
-    if (!row) return;
-    const name = row.dataset.name;
-    const type = row.dataset.type;
+  function setupClickHandlers() {
+    let clickTimer = null;
+    let lastClickName = null;
+    let longPressTriggered = false;
 
-    if (_selectionMode) {
-      toggleSelection(name);
-      return;
-    }
+    // Track whether long-press fired so we skip the click
+    $fileList.addEventListener('pointerdown', () => { longPressTriggered = false; });
 
-    const fullPath = _currentPath + '/' + name;
-    if (type === 'directory') {
-      navigateTo(fullPath);
-    } else {
-      if (typeof FileEditor !== 'undefined') FileEditor.open(fullPath);
-    }
+    $fileList.addEventListener('click', (e) => {
+      if (longPressTriggered) return;
+      const row = e.target.closest('.fb-file-row');
+      if (!row) return;
+      const name = row.dataset.name;
+      const type = row.dataset.type;
+
+      if (clickTimer && lastClickName === name) {
+        // Double click — open
+        clearTimeout(clickTimer);
+        clickTimer = null;
+        lastClickName = null;
+        const fullPath = _currentPath + '/' + name;
+        if (type === 'directory') {
+          navigateTo(fullPath);
+        } else {
+          if (typeof FileEditor !== 'undefined') FileEditor.open(fullPath);
+        }
+      } else {
+        // First click — wait to see if it's a double
+        if (clickTimer) clearTimeout(clickTimer);
+        lastClickName = name;
+        clickTimer = setTimeout(() => {
+          clickTimer = null;
+          lastClickName = null;
+          // Single click — toggle selection
+          toggleSelection(name);
+        }, 300);
+      }
+    });
+
+    // Expose flag so long-press handler can signal to skip click
+    $fileList._setLongPressTriggered = () => { longPressTriggered = true; };
   }
 
   // ---------- Long-press / Context Menu ----------
@@ -259,6 +278,7 @@ const FileBrowser = (() => {
       startY = e.clientY;
       timer = setTimeout(() => {
         timer = null;
+        if ($fileList._setLongPressTriggered) $fileList._setLongPressTriggered();
         showContextMenu(row, e);
       }, 500);
     });
@@ -280,7 +300,6 @@ const FileBrowser = (() => {
     row.classList.add('context-active');
 
     const actions = [
-      { label: 'Select', icon: '\u2610', action: 'select' },
       { label: 'Rename', icon: '\u270f\ufe0f', action: 'rename' },
       { label: 'Copy', icon: '\ud83d\udccb', action: 'copy' },
       { label: 'Move', icon: '\ud83d\udce6', action: 'move' },
@@ -326,9 +345,6 @@ const FileBrowser = (() => {
     if (!target) return;
 
     switch (action) {
-      case 'select':
-        enterSelectionMode(target.name);
-        break;
       case 'rename':
         promptRename(target);
         break;
@@ -386,19 +402,9 @@ const FileBrowser = (() => {
     }
   }
 
-  // ---------- Selection Mode ----------
+  // ---------- Selection ----------
 
-  function enterSelectionMode(initialName) {
-    _selectionMode = true;
-    _selected.clear();
-    if (initialName) _selected.add(initialName);
-    renderFileList();
-    updateSelectionBar();
-    $selectionBar.classList.remove('hidden');
-  }
-
-  function exitSelectionMode() {
-    _selectionMode = false;
+  function clearSelection() {
     _selected.clear();
     if ($selectionBar) $selectionBar.classList.add('hidden');
     if (_entries.length > 0) renderFileList();
@@ -408,11 +414,12 @@ const FileBrowser = (() => {
     if (_selected.has(name)) _selected.delete(name);
     else _selected.add(name);
     renderFileList();
-    updateSelectionBar();
-  }
-
-  function updateSelectionBar() {
-    // Update selection count in topbar could go here
+    // Show/hide selection bar based on whether anything is selected
+    if (_selected.size > 0) {
+      $selectionBar.classList.remove('hidden');
+    } else {
+      $selectionBar.classList.add('hidden');
+    }
   }
 
   async function handleSelectionAction(e) {
@@ -428,7 +435,7 @@ const FileBrowser = (() => {
           try { await api('delete', { path: p }); } catch {}
         }
         App.showToast(`Deleted ${_selected.size} items`, 'success', 2000);
-        exitSelectionMode();
+        clearSelection();
         await refresh();
         break;
       case 'download':
@@ -455,7 +462,7 @@ const FileBrowser = (() => {
               }
             }
             App.showToast(`${action === 'copy' ? 'Copied' : 'Moved'} ${_selected.size} items`, 'success', 2000);
-            exitSelectionMode();
+            clearSelection();
             await refresh();
           }
         );
