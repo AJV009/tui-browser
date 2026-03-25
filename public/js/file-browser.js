@@ -485,28 +485,14 @@ const FileBrowser = (() => {
     }
   }
 
-  async function downloadFile(filePath) {
-    // Use fetch with JSON body since backend only has express.json() middleware
-    try {
-      const res = await fetch('/api/files/download', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: filePath }),
-      });
-      if (!res.ok) throw new Error('Download failed');
-      const blob = await res.blob();
-      const name = filePath.split('/').pop();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = name;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      App.showToast(err.message, 'error');
-    }
+  function downloadFile(filePath) {
+    const url = '/api/files/download?path=' + encodeURIComponent(filePath);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filePath.split('/').pop();
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
   }
 
   function cycleSort() {

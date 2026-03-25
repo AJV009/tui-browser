@@ -37,12 +37,8 @@ const FileUpload = (() => {
       maxFiles: 50,
       server: {
         process: {
-          url: '/api/files/upload',
+          url: '/api/files/upload?targetDir=' + encodeURIComponent(_targetDir),
           method: 'POST',
-          ondata: (formData) => {
-            formData.append('targetDir', _targetDir);
-            return formData;
-          },
         },
       },
       labelIdle: 'Drag & drop files or <span class="filepond--label-action">Browse</span>',

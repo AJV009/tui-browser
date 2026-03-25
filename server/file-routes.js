@@ -269,8 +269,7 @@ function setup(app) {
   // Download file or zip folder
   const archiver = require('archiver');
 
-  app.post('/api/files/download', apiHandler(async (req, res) => {
-    const filePath = await validatePath(req.body.path);
+  async function handleDownload(filePath, res) {
     const stat = await fs.stat(filePath);
     const name = path.basename(filePath);
 
@@ -288,6 +287,16 @@ function setup(app) {
       const stream = fsSync.createReadStream(filePath);
       stream.pipe(res);
     }
+  }
+
+  app.post('/api/files/download', apiHandler(async (req, res) => {
+    const filePath = await validatePath(req.body.path);
+    await handleDownload(filePath, res);
+  }));
+
+  app.get('/api/files/download', apiHandler(async (req, res) => {
+    const filePath = await validatePath(req.query.path);
+    await handleDownload(filePath, res);
   }));
 
   // Get CWD of a tmux session
