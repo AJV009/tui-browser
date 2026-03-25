@@ -309,17 +309,24 @@ const FileBrowser = (() => {
     ];
 
     $contextMenu.innerHTML = actions.map(a =>
-      `<div class="fb-ctx-item${a.danger ? ' fb-ctx-danger' : ''}" data-action="${a.action}">
+      `${a.danger ? '<div class="fb-ctx-separator"></div>' : ''}<div class="fb-ctx-item${a.danger ? ' fb-ctx-danger' : ''}" data-action="${a.action}">
         <span class="fb-ctx-icon">${a.icon}</span>
         <span>${a.label}</span>
       </div>`
     ).join('');
 
-    // Position near the row
+    // Position: centered horizontally, below the row (or above if near bottom)
     const rect = row.getBoundingClientRect();
-    $contextMenu.style.top = Math.min(rect.bottom, window.innerHeight - 350) + 'px';
-    $contextMenu.style.left = '12px';
-    $contextMenu.style.right = '12px';
+    const menuWidth = 200;
+    const menuHeight = actions.length * 44 + 8; // approx
+    let top = rect.bottom + 4;
+    if (top + menuHeight > window.innerHeight - 16) {
+      top = Math.max(16, rect.top - menuHeight - 4);
+    }
+    const left = Math.max(16, (window.innerWidth - menuWidth) / 2);
+    $contextMenu.style.top = top + 'px';
+    $contextMenu.style.left = left + 'px';
+    $contextMenu.style.right = 'auto';
     $contextMenu.classList.remove('hidden');
     $contextBackdrop.classList.remove('hidden');
 
