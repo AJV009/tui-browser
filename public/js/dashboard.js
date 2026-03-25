@@ -8,7 +8,7 @@
 const Dashboard = (() => {
   let refreshInterval = null;
   const REFRESH_MS = 3000;
-  let sortMode = 'recent';
+  let sortMode = 'active';
   let lastSessions = null;
   let lastUnmatchedKitty = null;
   const selectedSessions = new Set();
@@ -61,6 +61,12 @@ const Dashboard = (() => {
     DashboardShortcuts.init(deps);
     DashboardBulkKill.init(deps);
     DashboardInfo.init(deps);
+
+    // Files button
+    const dashFilesBtn = document.getElementById('dashboard-files-btn');
+    if (dashFilesBtn) {
+      dashFilesBtn.addEventListener('click', () => FileBrowser.open());
+    }
 
     renderFromCache();
     startAutoRefresh();

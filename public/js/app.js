@@ -3,7 +3,7 @@
  * Network probing is in app-network.js (AppNetwork).
  */
 
-/* global Dashboard, TerminalView, AppNetwork */
+/* global Dashboard, TerminalView, AppNetwork, FileBrowser */
 
 const App = (() => {
   let currentView = 'dashboard';
@@ -12,6 +12,7 @@ const App = (() => {
   const views = {
     dashboard: () => document.getElementById('dashboard-view'),
     terminal: () => document.getElementById('terminal-view'),
+    files: () => document.getElementById('file-browser-overlay'),
   };
 
   function navigate(view, params = {}) {
@@ -31,6 +32,13 @@ const App = (() => {
     views.terminal().classList.add('hidden');
 
     const backBtn = document.getElementById('back-btn');
+
+    if (view === 'files') {
+      const encodedPath = parts.slice(1).join('/');
+      const initialPath = encodedPath ? decodeURIComponent(encodedPath) : null;
+      FileBrowser.open(initialPath);
+      return;
+    }
 
     if (view === 'terminal' && parts[1]) {
       const sessionName = decodeURIComponent(parts[1]);
@@ -202,6 +210,7 @@ const App = (() => {
     Dashboard.init();
     TerminalView.init();
     TerminalNotes.initNotesOverlay();
+    FileBrowser.init();
     handleRoute();
     startVersionPolling();
     initConnectivityToasts();
