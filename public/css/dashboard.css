@@ -167,7 +167,7 @@
 
 .session-expiry {
   font-family: var(--mono); font-size: 10px; color: var(--danger);
-  margin-bottom: 8px; opacity: 0.8;
+  margin-top: 8px; margin-bottom: 0; opacity: 0.8;
 }
 
 /* ========== Selection Circle ========== */
