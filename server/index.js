@@ -16,6 +16,7 @@ const kittyDiscovery = require('./kitty-discovery');
 const state = require('./state');
 const aiTitles = require('./ai-titles');
 const routes = require('./routes');
+const fileRoutes = require('./file-routes');
 
 const PORT = parseInt(process.env.PORT || process.argv[2], 10) || 3000;
 const HTTPS_PORT = parseInt(process.env.HTTPS_PORT, 10) || PORT + 1;
@@ -57,6 +58,7 @@ routes.setup(app, {
   discovery, sessions, kittyDiscovery, state, aiTitles,
   config: { PORT, HTTPS_PORT, FULL_VERSION, BUILD_ID },
 });
+fileRoutes.setup(app);
 
 // ---------- AI Auto-Title Loop ----------
 
