@@ -34,7 +34,7 @@ Fully custom implementation — REST API backend + IIFE frontend module. No thir
 | Asset | Purpose | Integration |
 |-------|---------|-------------|
 | **vscode-icons** | File/folder type icons (1,480 SVGs) | Copy SVGs to `public/icons/`, use `vscode-icons-js` mapping |
-| **CodeMirror 6** | Text file viewing/editing with syntax highlighting | Pre-bundle once via esbuild, serve as static JS |
+| **CodeMirror 6** | Text file viewing/editing with syntax highlighting | One-time esbuild bundle → `public/vendor/codemirror.bundle.js`, committed to git as a vendored static file. No build pipeline — just a dev-time script (`scripts/bundle-codemirror.sh`) run once when updating CM6 version. |
 | **FilePond** | Upload widget with progress/queue UI | CDN (`<script>` + `<link>`) |
 
 ## Backend API
@@ -58,6 +58,15 @@ All endpoints under `/api/files`. Every endpoint validates resolved paths stay w
 | `/api/files/move` | POST | `{ src, dest }` | `{ success }` | Move file/folder |
 | `/api/files/copy` | POST | `{ src, dest }` | `{ success }` | Copy file/folder |
 | `/api/files/cwd` | GET | `?session=name` | `{ path }` | Get CWD of a tmux session |
+
+### Conflict Handling
+
+All operations that create or place files follow the same conflict policy:
+
+- **Upload:** If a file with the same name exists in the target directory, the server appends a numeric suffix (e.g., `file (1).txt`, `file (2).txt`) and returns the actual saved filename.
+- **Copy/Move:** If the destination path already exists, return an error `{ error: "exists", existing: { name, type, size } }`. The frontend shows a confirmation: "File already exists. Replace?" If confirmed, re-send the request with `{ overwrite: true }`.
+- **Mkdir:** If the directory already exists, return success silently (idempotent, like `mkdir -p`).
+- **Rename:** If the target name already exists, return an error. Frontend shows "A file with that name already exists."
 
 ### Security
 
@@ -143,8 +152,8 @@ Floating menu appears below the pressed item with a dimmed backdrop:
 
 1. **Select** — dismiss menu, enter multi-select mode with this item checked
 2. **Rename** — inline rename input on the file row
-3. **Copy** — enters "copy mode" (directory picker to choose destination)
-4. **Move** — enters "move mode" (directory picker to choose destination)
+3. **Copy** — enters "copy mode" (directory picker overlay to choose destination)
+4. **Move** — enters "move mode" (directory picker overlay to choose destination)
 5. **Download** — triggers file download (or zip for folders)
 6. **Info** — shows file details (size, permissions, modified, full path)
 7. **Delete** — confirmation dialog, then deletes (danger red)
@@ -198,6 +207,32 @@ Triggered by tapping "Select" in the context menu:
 - **Save** → POST to `/api/files/write`, toast on success, returns to read-only mode.
 - **Large files (>1MB):** Warning before loading: "This file is large (X MB). Open anyway or download?"
 - **Binary files:** Info screen with download button only — no editor.
+
+### Directory Picker (Copy/Move Destination)
+
+When the user selects Copy or Move (from context menu or selection action bar), a directory picker overlay appears:
+
+```
+┌─────────────────────────────────┐
+│ ✕  Move to...                     │  ← Title shows operation
+├─────────────────────────────────┤
+│ ~/project/tui-browser             │  ← Current location (tappable breadcrumb)
+├─────────────────────────────────┤
+│ 📁 public                       › │
+│ 📁 server                       › │  ← Only folders shown (no files)
+│ 📁 node_modules                  › │
+├─────────────────────────────────┤
+│        [+ New Folder]  [Move Here] │  ← Create folder in current location + confirm
+└─────────────────────────────────┘
+```
+
+- Reuses the same file list component but **only shows directories** (files are hidden)
+- Tap a folder to navigate into it
+- Breadcrumb navigation works the same as the main file browser
+- **"Move Here" / "Copy Here"** button (accent green) confirms the destination as the currently browsed directory
+- **"+ New Folder"** allows creating a new folder in the current location as a destination
+- **✕** cancels the operation and returns to the file browser
+- If the destination has a naming conflict, the conflict handling rules above apply
 
 ### Upload Flow
 
