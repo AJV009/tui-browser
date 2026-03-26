@@ -17,9 +17,10 @@ const FileUpload = (() => {
     document.getElementById('fu-close-btn').addEventListener('click', close);
   }
 
-  function open(targetDir, onComplete) {
+  function open(targetDir, onComplete, serverOrigin) {
     _targetDir = targetDir;
     _onComplete = onComplete;
+    const _origin = serverOrigin || '';
 
     // Display shortened path
     const home = targetDir.match(/^\/home\/[^/]+/)?.[0] || '';
@@ -37,7 +38,7 @@ const FileUpload = (() => {
       maxFiles: 50,
       server: {
         process: {
-          url: '/api/files/upload?targetDir=' + encodeURIComponent(_targetDir),
+          url: `${_origin}/api/files/upload?targetDir=` + encodeURIComponent(_targetDir),
           method: 'POST',
         },
       },

@@ -5,7 +5,7 @@
  * Drafts auto-save to server; sent text is recorded in per-session history.
  */
 
-/* global App, TerminalControls, TerminalNotes */
+/* global App, TerminalControls, TerminalNotes, ServerManager */
 
 const TerminalTextInput = (() => {
   let _term = null;
@@ -13,6 +13,8 @@ const TerminalTextInput = (() => {
   let _sessionName = null;
   let _draftTimer = null;
   let _lastSavedDraft = '';
+
+  const _origin = () => { const s = App.getCurrentServer(); return s ? ServerManager.getOrigin(s) : ''; };
 
   const panel = () => document.getElementById('text-input-panel');
   const textarea = () => document.getElementById('text-input-area');
@@ -79,7 +81,7 @@ const TerminalTextInput = (() => {
     if (text === _lastSavedDraft || !_sessionName) return;
     _lastSavedDraft = text;
     try {
-      await fetch(`/api/sessions/${encodeURIComponent(_sessionName)}/draft`, {
+      await fetch(`${_origin()}/api/sessions/${encodeURIComponent(_sessionName)}/draft`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),
@@ -90,7 +92,7 @@ const TerminalTextInput = (() => {
   async function restoreDraft() {
     if (!_sessionName) return;
     try {
-      const res = await fetch(`/api/sessions/${encodeURIComponent(_sessionName)}/input-history`);
+      const res = await fetch(`${_origin()}/api/sessions/${encodeURIComponent(_sessionName)}/input-history`);
       if (!res.ok) return;
       const data = await res.json();
       if (data.draft) {
@@ -200,7 +202,7 @@ const TerminalTextInput = (() => {
 
       // Save to history
       if (_sessionName) {
-        fetch(`/api/sessions/${encodeURIComponent(_sessionName)}/input-history`, {
+        fetch(`${_origin()}/api/sessions/${encodeURIComponent(_sessionName)}/input-history`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ text }),

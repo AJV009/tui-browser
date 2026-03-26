@@ -9,7 +9,6 @@ const Dashboard = (() => {
   let refreshInterval = null;
   const REFRESH_MS = 3000;
   let sortMode = 'active';
-  let lastSessions = null;
   let lastUnmatchedKitty = null;
   const selectedSessions = new Set();
 
@@ -37,10 +36,10 @@ const Dashboard = (() => {
       const action = btn.dataset.action;
       if (action === 'connect') connectTo(btn.dataset.session, btn.dataset.server);
       else if (action === 'open-terminal') openOnPC(btn.dataset.session, btn);
-      else if (action === 'info') DashboardInfo.open(btn.dataset.session);
+      else if (action === 'info') DashboardInfo.open(btn.dataset.session, btn.dataset.server);
       else if (action === 'kill') kill(btn.dataset.session, btn.dataset.server);
       else if (action === 'toggle-select') DashboardBulkKill.toggleSelect(btn.dataset.session);
-      else if (action === 'toggle-lock') toggleLock(btn.dataset.session);
+      else if (action === 'toggle-lock') toggleLock(btn.dataset.session, btn.dataset.server);
       else if (action === 'reconnect-server') { btn.classList.add('syncing'); ServerManager.reconnectServer(btn.dataset.server); }
       else if (action === 'server-files') { e.stopPropagation(); FileBrowser.open(null, ServerManager.getOrigin(btn.dataset.server)); }
       else if (action === 'toggle-collapse') { const n = btn.dataset.server; setCollapsed(n, !getCollapsed()[n]); renderMultiServer(); }
@@ -60,7 +59,7 @@ const Dashboard = (() => {
     document.getElementById('sort-select').addEventListener('change', (e) => { sortMode = e.target.value; refresh(); });
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refresh(); });
 
-    const deps = { esc, connectTo, selectedSessions, getLastSessions: () => lastSessions || [], refresh };
+    const deps = { esc, connectTo, selectedSessions, getLastSessions: () => Object.values(ServerManager.getServerStates()).flatMap(s => s.sessions || []), refresh };
     DashboardShortcuts.init(deps);
     DashboardBulkKill.init(deps);
     DashboardInfo.init(deps);
@@ -119,14 +118,14 @@ const Dashboard = (() => {
 
     return `<div class="session-card${hasKitty ? ' kitty-card' : ''}${isSel ? ' session-selected' : ''}${isLocked ? ' session-locked' : ''}" data-session="${esc(s.name)}"${s._server ? ` data-server="${esc(s._server)}"` : ''}>
         <div class="select-circle${isSel ? ' selected' : ''}" data-action="toggle-select" data-session="${esc(s.name)}"></div>
-        <div class="lock-toggle${isLocked ? ' locked' : ''}" data-action="toggle-lock" data-session="${esc(s.name)}" title="${isLocked ? 'Unlock' : 'Lock'}">${isLocked ? ICON.lock : ICON.unlock}</div>
+        <div class="lock-toggle${isLocked ? ' locked' : ''}" data-action="toggle-lock" data-session="${esc(s.name)}"${s._server ? ` data-server="${esc(s._server)}"` : ''} title="${isLocked ? 'Unlock' : 'Lock'}">${isLocked ? ICON.lock : ICON.unlock}</div>
         <div class="session-card-header"><span class="session-name">${esc(label)}</span><span class="session-status">${hasKitty ? '<span class="source-badge kitty-badge">Kitty</span>' : ''}<span class="status-dot ${statusClass}"></span>${statusLabel}</span></div>
         ${kittyBadge}
         <div class="session-meta"><span>${esc(cmd)}</span><span>${created}</span>${paneTitle ? `<span>${esc(paneTitle)}</span>` : ''}</div>
         <div class="session-actions">
           <button class="btn btn-primary btn-icon" data-action="connect" data-session="${esc(s.name)}"${s._server ? ` data-server="${esc(s._server)}"` : ''} title="Connect">${ICON.connect}</button>
           <button class="btn btn-secondary btn-icon" data-action="open-terminal" data-session="${esc(s.name)}" title="Open on PC">${ICON.monitor}</button>
-          <button class="btn btn-secondary btn-icon" data-action="info" data-session="${esc(s.name)}" title="Session info">${ICON.info}</button>
+          <button class="btn btn-secondary btn-icon" data-action="info" data-session="${esc(s.name)}"${s._server ? ` data-server="${esc(s._server)}"` : ''} title="Session info">${ICON.info}</button>
           <button class="btn btn-danger btn-icon${isLocked ? ' btn-locked' : ''}" data-action="kill" data-session="${esc(s.name)}"${s._server ? ` data-server="${esc(s._server)}"` : ''} title="${isLocked ? 'Locked' : 'Kill'}"${isLocked ? ' disabled' : ''}>${ICON.kill}</button>
         </div>
         ${expiryHtml}</div>`;
@@ -261,7 +260,9 @@ const Dashboard = (() => {
   async function openOnPC(sessionName, btn) {
     try {
       btn.disabled = true; btn.style.opacity = '0.5';
-      await fetch(`/api/sessions/${encodeURIComponent(sessionName)}/open-terminal`, { method: 'POST' });
+      const serverName = btn.closest('.session-card')?.dataset.server;
+      const origin = serverName ? ServerManager.getOrigin(serverName) : '';
+      await fetch(`${origin}/api/sessions/${encodeURIComponent(sessionName)}/open-terminal`, { method: 'POST' });
       setTimeout(() => { btn.disabled = false; btn.style.opacity = ''; }, 2000);
     } catch { setTimeout(() => { btn.disabled = false; btn.style.opacity = ''; }, 2000); }
   }
@@ -280,8 +281,12 @@ const Dashboard = (() => {
     } catch (err) { await App.showModal('Failed to kill session: ' + err.message, 'OK'); }
   }
 
-  async function toggleLock(name) {
-    try { const res = await fetch(`/api/sessions/${encodeURIComponent(name)}/lock`, { method: 'POST' }); if (res.ok) await refresh(); } catch {}
+  async function toggleLock(name, serverName) {
+    try {
+      const origin = serverName ? ServerManager.getOrigin(serverName) : '';
+      const res = await fetch(`${origin}/api/sessions/${encodeURIComponent(name)}/lock`, { method: 'POST' });
+      if (res.ok) await refresh();
+    } catch {}
   }
 
   return { init, refresh, renderMultiServer };

@@ -3,7 +3,7 @@
  * Controls (scroll, text select, quickbar, session ops) are in terminal-controls.js.
  */
 
-/* global Terminal, FitAddon, WebglAddon, App, TerminalControls */
+/* global Terminal, FitAddon, WebglAddon, App, TerminalControls, ServerManager */
 
 const TerminalView = (() => {
   let term = null;
@@ -267,7 +267,7 @@ const TerminalView = (() => {
       }, 50);
 
       if (!isTouchUser) term.focus();
-      checkClaudeStatus(sessionName);
+      checkClaudeStatus(sessionName, serverName);
 
       const pending = connectResolvers.splice(0);
       pending.forEach(r => r.resolve());
@@ -335,9 +335,10 @@ const TerminalView = (() => {
     setStatus('', 'Disconnected');
   }
 
-  async function checkClaudeStatus(sessionName) {
+  async function checkClaudeStatus(sessionName, serverName) {
     try {
-      const res = await fetch(`/api/sessions/${encodeURIComponent(sessionName)}/claude-status`);
+      const origin = serverName ? ServerManager.getOrigin(serverName) : '';
+      const res = await fetch(`${origin}/api/sessions/${encodeURIComponent(sessionName)}/claude-status`);
       const data = await res.json();
       if (data.remoteControlUrl) {
         claudeRemoteUrl = data.remoteControlUrl;

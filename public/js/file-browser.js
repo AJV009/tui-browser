@@ -37,7 +37,7 @@ const FileBrowser = (() => {
     document.getElementById('fb-back-btn').addEventListener('click', close);
     // Action pills
     document.getElementById('fb-upload-btn').addEventListener('click', () => {
-      if (typeof FileUpload !== 'undefined') FileUpload.open(_currentPath, () => refresh());
+      if (typeof FileUpload !== 'undefined') FileUpload.open(_currentPath, () => refresh(), _serverOrigin);
     });
     document.getElementById('fb-mkdir-btn').addEventListener('click', promptMkdir);
     document.getElementById('fb-sort-btn').addEventListener('click', cycleSort);

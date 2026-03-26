@@ -2,7 +2,7 @@
  * dashboard-bulk-kill.js — Session selection, bulk kill modal, and filter logic.
  */
 
-/* global App */
+/* global App, ServerManager */
 
 const DashboardBulkKill = (() => {
   let _deps = null;
@@ -160,19 +160,37 @@ const DashboardBulkKill = (() => {
 
   async function executeBulkKill(names, filter, inactiveMinutes) {
     try {
-      const body = { names };
-      if (filter) body.filter = filter;
-      if (inactiveMinutes !== undefined) body.inactiveMinutes = inactiveMinutes;
-      const res = await fetch('/api/sessions/bulk-kill', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) { const err = await res.json(); await App.showModal(err.error || 'Bulk kill failed', 'OK'); return; }
-      const result = await res.json();
-      for (const name of result.killed) _deps.selectedSessions.delete(name);
-      if (result.failed.length > 0) {
-        await App.showModal(`Killed ${result.killed.length}. Failed: ${result.failed.map(f => f.name).join(', ')}`, 'OK');
+      // Get all sessions to find server mapping
+      const allSessions = _deps.getLastSessions();
+      const byServer = {};
+      for (const name of names) {
+        const session = allSessions.find(s => s.name === name);
+        const server = session?._server || 'HOST';
+        if (!byServer[server]) byServer[server] = [];
+        byServer[server].push(name);
+      }
+
+      let totalKilled = [], totalFailed = [];
+      for (const [server, serverNames] of Object.entries(byServer)) {
+        const origin = server !== 'HOST' ? ServerManager.getOrigin(server) : '';
+        const body = { names: serverNames };
+        if (filter) body.filter = filter;
+        if (inactiveMinutes !== undefined) body.inactiveMinutes = inactiveMinutes;
+        const res = await fetch(`${origin}/api/sessions/bulk-kill`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        if (res.ok) {
+          const result = await res.json();
+          totalKilled.push(...result.killed);
+          totalFailed.push(...result.failed);
+        }
+      }
+
+      for (const name of totalKilled) _deps.selectedSessions.delete(name);
+      if (totalFailed.length > 0) {
+        await App.showModal(`Killed ${totalKilled.length}. Failed: ${totalFailed.map(f => f.name).join(', ')}`, 'OK');
       }
       await _deps.refresh();
     } catch (err) {

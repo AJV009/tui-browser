@@ -2,6 +2,8 @@
  * dashboard-info.js — Session info overlay with live stats, process table, and output.
  */
 
+/* global ServerManager */
+
 const DashboardInfo = (() => {
   let infoInterval = null;
   let _esc = null;
@@ -11,12 +13,12 @@ const DashboardInfo = (() => {
     document.getElementById('info-close').addEventListener('click', close);
   }
 
-  function open(sessionName) {
+  function open(sessionName, serverName) {
     document.getElementById('info-session-name').textContent = sessionName;
     document.getElementById('session-info-overlay').classList.remove('hidden');
     document.getElementById('info-body').innerHTML = '<div style="padding:20px;color:var(--text-muted);font-family:var(--mono);font-size:12px;">Loading\u2026</div>';
-    fetchData(sessionName);
-    infoInterval = setInterval(() => fetchData(sessionName), 2000);
+    fetchData(sessionName, serverName);
+    infoInterval = setInterval(() => fetchData(sessionName, serverName), 2000);
   }
 
   function close() {
@@ -24,9 +26,10 @@ const DashboardInfo = (() => {
     if (infoInterval) { clearInterval(infoInterval); infoInterval = null; }
   }
 
-  async function fetchData(sessionName) {
+  async function fetchData(sessionName, serverName) {
     try {
-      const res = await fetch(`/api/sessions/${encodeURIComponent(sessionName)}/info`);
+      const origin = serverName ? ServerManager.getOrigin(serverName) : '';
+      const res = await fetch(`${origin}/api/sessions/${encodeURIComponent(sessionName)}/info`);
       if (!res.ok) throw new Error('Session not found');
       render(await res.json());
     } catch (err) {
