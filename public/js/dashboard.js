@@ -148,8 +148,6 @@ const Dashboard = (() => {
 
   const RECONNECT_SVG = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 8a5.5 5.5 0 0 1 9.3-4"/><path d="M13.5 8a5.5 5.5 0 0 1-9.3 4"/><path d="M11.5 1.5v3h3"/><path d="M4.5 14.5v-3h-3"/></svg>';
   const FILES_SVG = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>';
-  const LOCAL_SVG = '<svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="#00e5a0" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 7.5L8 2l6 5.5"/><path d="M3.5 6.5V14H7v-4h2v4h3.5V6.5"/></svg>';
-  const TUNNEL_SVG = '<svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="#fb923c" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6.5"/><path d="M1.5 8h13M8 1.5c-2 2-3 4-3 6.5s1 4.5 3 6.5M8 1.5c2 2 3 4 3 6.5s-1 4.5-3 6.5"/></svg>';
 
   // Collapsed state per server group (persisted in localStorage)
   function getCollapsed() {
@@ -163,8 +161,6 @@ const Dashboard = (() => {
 
   function renderMultiServer() {
     const list = document.getElementById('session-list');
-    const connMode = document.getElementById('connection-mode');
-    if (connMode) connMode.style.display = 'none';
     const states = ServerManager.getServerStates();
     // Ensure HOST is always first
     const serverNames = ['HOST', ...Object.keys(states).filter(n => n !== 'HOST')];
@@ -187,9 +183,6 @@ const Dashboard = (() => {
       html += `<div class="server-group-header-left">`;
       html += `<span class="server-group-chevron">${isCollapsed ? '\u25B6' : '\u25BC'}</span>`;
       html += `<span class="server-group-name">${esc(name)}</span>`;
-      if (isOnline && state.mode) {
-        html += `<span class="server-group-mode-icon" title="${state.mode === 'local' ? 'Local network (LAN)' : 'Internet'}">${state.mode === 'local' ? LOCAL_SVG : TUNNEL_SVG}</span>`;
-      }
 
       if (isUpdating) {
         html += `<span class="server-updating-label">updating\u2026</span>`;
