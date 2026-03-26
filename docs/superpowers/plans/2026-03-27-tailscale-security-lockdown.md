@@ -1065,7 +1065,74 @@ git commit -m "docs: rewrite README for Tailscale-only networking"
 
 ---
 
-### Task 9: Final Cleanup and Integration Test
+### Task 9: Remove Cloudflare Tunnels and Services
+
+**Infrastructure cleanup on both 3400 and g5.**
+
+- [ ] **Step 1: Stop and disable tunnel services on both machines**
+
+```bash
+# On 3400 (this machine)
+systemctl --user stop tui-browser-tunnel.service
+systemctl --user disable tui-browser-tunnel.service
+rm ~/.config/systemd/user/tui-browser-tunnel.service
+systemctl --user daemon-reload
+
+# On g5
+ssh g5-server "systemctl --user stop tui-browser-tunnel.service"
+ssh g5-server "systemctl --user disable tui-browser-tunnel.service"
+ssh g5-server "rm ~/.config/systemd/user/tui-browser-tunnel.service"
+ssh g5-server "systemctl --user daemon-reload"
+```
+
+- [ ] **Step 2: Delete Cloudflare tunnels**
+
+Two tunnels to remove:
+
+```bash
+# Delete tui-browser-desktop tunnel (3400.ajv009.com) — ID: 53b41e13-8d41-4a8e-914e-0d2d25297fa7
+cloudflared tunnel cleanup tui-browser-desktop
+cloudflared tunnel delete tui-browser-desktop
+
+# Delete tui-browser tunnel (tui.ajv009.com) — ID: 3bd23f24-3203-4960-afdf-3a0e972a4bda
+cloudflared tunnel cleanup tui-browser
+cloudflared tunnel delete tui-browser
+```
+
+Note: `tunnel cleanup` closes active connections first, `tunnel delete` removes the tunnel. The DNS routes (CNAME records) for `tui.ajv009.com` and `3400.ajv009.com` will become orphaned — delete them from Cloudflare DNS dashboard if desired.
+
+- [ ] **Step 3: Remove Cloudflare config files on 3400**
+
+```bash
+rm -f ~/.cloudflared/tui-browser.yml
+rm -f ~/.cloudflared/tui-browser-desktop.yml
+rm -f ~/.cloudflared/3bd23f24-3203-4960-afdf-3a0e972a4bda.json
+rm -f ~/.cloudflared/53b41e13-8d41-4a8e-914e-0d2d25297fa7.json
+```
+
+- [ ] **Step 4: Remove Cloudflare config files on g5**
+
+```bash
+ssh g5-server "rm -f ~/.cloudflared/tui-browser.yml"
+ssh g5-server "rm -f ~/.cloudflared/3bd23f24-3203-4960-afdf-3a0e972a4bda.json"
+```
+
+- [ ] **Step 5: Verify tunnels are gone**
+
+```bash
+cloudflared tunnel list 2>&1 | grep tui-browser
+# Expected: no matches
+
+systemctl --user list-units --all 2>&1 | grep tunnel
+# Expected: no matches
+
+ssh g5-server "systemctl --user list-units --all 2>&1 | grep tunnel"
+# Expected: no matches
+```
+
+---
+
+### Task 10: Final Cleanup and Integration Test
 
 **Files:**
 - Verify all changes work together
