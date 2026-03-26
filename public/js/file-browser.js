@@ -291,6 +291,14 @@ const FileBrowser = (() => {
     });
     $fileList.addEventListener('pointerup', () => { if (timer) clearTimeout(timer); timer = null; });
     $fileList.addEventListener('pointercancel', () => { if (timer) clearTimeout(timer); timer = null; });
+
+    // Right-click opens custom context menu, suppress browser menu
+    $fileList.addEventListener('contextmenu', (e) => {
+      const row = e.target.closest('.fb-file-row');
+      if (!row) return;
+      e.preventDefault();
+      showContextMenu(row, e);
+    });
   }
 
   function showContextMenu(row, e) {
