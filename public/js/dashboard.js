@@ -276,7 +276,13 @@ const Dashboard = (() => {
     const name = nameInput.value.trim(), command = cmdInput.value.trim() || 'bash';
     if (!name) { nameInput.focus(); return; }
     try {
-      const res = await fetch('/api/sessions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, command }) });
+      let origin = '';
+      if (ServerManager.isMultiServer()) {
+        const states = ServerManager.getServerStates();
+        const firstOnline = Object.values(states).find(s => s.online);
+        if (firstOnline) origin = firstOnline.origin;
+      }
+      const res = await fetch(`${origin}/api/sessions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, command }) });
       if (!res.ok) { const err = await res.json(); await App.showModal(err.error || 'Failed to create session', 'OK'); return; }
       nameInput.value = ''; cmdInput.value = '';
       await refresh();
