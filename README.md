@@ -44,7 +44,7 @@ Built for TUI-heavy workflows (Claude Code, OpenCode, Codex, htop, etc.) where y
 ### Dashboard & Session Tools
 
 - **Unified dashboard** — tmux sessions grouped by server, enriched with Kitty metadata (tab title, focus state, viewer count). Collapsible server sections with state persisted in browser.
-- **Server settings panel** — add/remove servers via the wrench icon. Enter a URL (tunnel or local IP), sync button auto-discovers LAN IPs for fast-path connections.
+- **Server settings panel** — add/remove servers via the wrench icon. Enter Tailscale IPs or MagicDNS hostnames.
 - **Quick Launch** — preset and custom commands saved to `shortcuts.json`, launch sessions in one tap.
 - **Bulk session kill** — select multiple sessions to kill at once, or use filter presets: detached, idle, no running commands, or all.
 - **Session info panel** — live-updating stats: memory, CPU, process tree, uptime, recent terminal output.
@@ -65,7 +65,7 @@ Built for TUI-heavy workflows (Claude Code, OpenCode, Codex, htop, etc.) where y
 
 ### Under the Hood
 
-- **Local network fast-path** — auto-discovers LAN IPs from each server and races them against the configured URL. Green house icon = local, orange globe = remote. Works per-server in multi-machine setups.
+- **Tailscale network isolation** — binds exclusively to the Tailscale interface. Unreachable from public internet or local LAN.
 - **Auto-update** — remote servers auto-pull from git and restart when the primary server's version bumps. Pre-commit hook auto-bumps patch version on every commit.
 - **Auto-discovery** — PID matching links Kitty windows to their tmux sessions automatically.
 - **60fps TUI rendering** — tmux + xterm.js WebGL handles high-frequency output (Claude Code, Ratatui apps, etc.)
@@ -73,7 +73,6 @@ Built for TUI-heavy workflows (Claude Code, OpenCode, Codex, htop, etc.) where y
 - **Cache-first rendering** — sessions load instantly from cache, no flash on page load or phone wake.
 - **Online/offline detection** — toast notifications for connectivity changes.
 - **Auto-restart** — systemd service with file watcher restarts the server on code changes.
-- **Cloudflare Tunnel support** — secure remote access via HTTPS with zero port forwarding.
 - **Zero build frontend** — vanilla JS, xterm.js/FilePond from CDN, CodeMirror 6 + vscode-icons pre-bundled in `public/vendor/`.
 
 <table>
@@ -108,7 +107,7 @@ The install script handles:
 - Server identity (`data/identity.json`) — names the server for the dashboard
 - Pre-commit hook for auto version bumping
 
-After install, the dashboard is at `http://localhost:7483`. Add additional servers via the wrench icon in the dashboard header.
+After install, the dashboard is at `http://<tailscale-ip>:7483`. Add additional servers via the wrench icon in the dashboard header.
 
 ### Manual Start (without systemd)
 
@@ -121,6 +120,7 @@ PORT=7483 npm start
 
 - **Node.js** >= 18
 - **tmux** >= 3.2 (for `allow-passthrough`)
+- **Tailscale** — required for network access ([install](https://tailscale.com/download))
 - **Kitty** (optional — for host terminal integration)
 - **Claude CLI** (optional — for AI session title generation)
 
@@ -136,125 +136,41 @@ shell /path/to/your/.local/bin/tmux-kitty-shell
 
 Restart Kitty. Every new window will launch inside tmux, and the dashboard will show them with Kitty badges.
 
-## Local Network Fast-Path (Auto-Switching)
+## Network Access (Tailscale)
 
-When your phone/tablet is on the same network as the host PC (WiFi, hotspot), the app automatically switches from the Cloudflare tunnel to a direct local connection for dramatically lower latency.
+TUI Browser requires [Tailscale](https://tailscale.com/) for network access. Tailscale creates an encrypted mesh VPN — the server binds exclusively to its Tailscale IP and is invisible to the public internet and local LAN.
 
-**How it works:**
-- The server runs HTTPS on port 7484 alongside HTTP on 7483
-- The client races local IPs against the tunnel on every network event — fastest path wins
-- When a local connection succeeds, the WebSocket switches to the direct path instantly
-- When the local connection is lost, it falls back to the tunnel seamlessly
-- A green house icon in the header = local (LAN), orange globe = tunnel (internet)
+**Setup:**
 
-**Detection triggers** — the app re-checks the best path on:
-- Dashboard session polling (every 3 seconds, piggybacks on existing calls)
-- Network type changes (WiFi ↔ mobile data)
-- Online/offline transitions
-- Phone wake / tab focus
-- WebSocket disconnection (strongest signal of network change)
+1. Install Tailscale on all machines: https://tailscale.com/download
+2. Run `tailscale up` and authenticate
+3. Run `./install.sh` — it auto-detects the Tailscale IP and binds to it
 
-**One-time setup per device:**
+**Access from any device:**
+- Install the Tailscale app (Android, iOS, macOS, Windows, Linux)
+- Join the same Tailscale network
+- Open `http://<tailscale-ip>:7483` in your browser
 
-1. Generate certificates (done automatically by `install.sh`, or manually):
-   ```bash
-   ./scripts/generate-certs.sh
-   ```
-
-2. Accept the certificate on your device. A guided setup page is available at `/setup-local.html`:
-
-   **Android (Chrome):**
-   - Open the setup page — tap the link to your local server
-   - Tap **Advanced** → **Proceed to [IP] (unsafe)** (this is safe — it's your own server)
-   - Chrome remembers the exception permanently
-
-   **iOS (Safari):**
-   - Download the CA cert from the setup page
-   - Go to **Settings > General > VPN & Device Management** → Install the profile
-   - Go to **Settings > General > About > Certificate Trust Settings** → Enable trust
-
-   **Desktop:**
-   - Visit `https://localhost:7484` and accept the warning
-   - Or run `sudo mkcert -install` to trust system-wide
-
-3. The app will detect the local connection within seconds and switch — green house icon appears
-
-**When does it activate?**
-- Phone connected to same WiFi as the host PC
-- Phone hotspot with the PC connected to it
-- Any network where both devices can reach each other directly
-
-**Regenerating certificates** (e.g., when your local IP changes):
-```bash
-./scripts/generate-certs.sh
-systemctl --user restart tui-browser
-```
-You'll need to re-accept the cert on your devices after regenerating.
-
-## Remote Access (Cloudflare Tunnel)
-
-For secure access from anywhere (phone, other computers), use a [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/):
-
-```bash
-# Create tunnel
-cloudflared tunnel create tui-browser
-
-# Route your domain
-cloudflared tunnel route dns tui-browser tui.yourdomain.com
-
-# Create config (~/.cloudflared/tui-browser.yml)
-tunnel: <TUNNEL_ID>
-credentials-file: /path/to/.cloudflared/<TUNNEL_ID>.json
-
-ingress:
-  - hostname: tui.yourdomain.com
-    service: http://localhost:7483
-  - service: http_status:404
-```
-
-Then create a systemd user service to keep the tunnel running:
-
-```ini
-# ~/.config/systemd/user/tui-browser-tunnel.service
-[Unit]
-Description=Cloudflare Tunnel for TUI Browser
-After=network-online.target tui-browser.service
-Wants=network-online.target
-
-[Service]
-Type=simple
-ExecStart=/usr/bin/cloudflared tunnel --config /path/to/.cloudflared/tui-browser.yml run
-Restart=on-failure
-RestartSec=5
-
-[Install]
-WantedBy=default.target
-```
-
-```bash
-systemctl --user enable --now tui-browser-tunnel.service
-```
+**MagicDNS:** Tailscale assigns each machine a hostname like `machine-name.tailnet-name.ts.net`. Use these instead of raw IPs.
 
 ## Security
 
-**This tool gives full shell access and filesystem access from a browser. Do not expose without authentication.**
+**This tool gives full shell access and filesystem access from a browser.**
 
-### Recommended: Cloudflare Access (Zero Trust)
+TUI Browser binds exclusively to the Tailscale network interface. It is unreachable from the public internet or local LAN — only devices on your Tailscale network can connect.
 
-If using Cloudflare Tunnel, add [Cloudflare Access](https://developers.cloudflare.com/cloudflare-one/applications/configure-apps/self-hosted-apps/) for authentication:
+**Defense layers:**
+- **Network isolation** — server binds to Tailscale IP only (`BIND` env var)
+- **WireGuard encryption** — all traffic encrypted end-to-end by Tailscale
+- **Device authentication** — only devices you approve on your Tailscale account can reach the server
+- **No exposed ports** — nothing listens on public or LAN interfaces
 
-1. Go to **Cloudflare One** → **Access** → **Applications**
-2. Add a **Self-hosted** application with your tunnel domain
-3. Create an **Allow** policy with your email
-4. Cloudflare shows a login page and sends a one-time code to verify identity
-
-This is the recommended approach — authentication is handled by Cloudflare's infrastructure before traffic ever reaches your server. No passwords to manage, no custom auth code to maintain.
-
-### Alternatives
-
-- **Reverse proxy with auth** — nginx/Caddy with TLS + basic auth or OAuth
-- **Localhost only** — bind to 127.0.0.1 and use SSH tunneling (`ssh -L 7483:localhost:7483 user@host`)
-- **Firewall** — block port 7483 from external access
+**Recommended firewall rules** (defense in depth):
+```bash
+# Block tui-browser ports on all non-Tailscale interfaces
+sudo ufw deny 7483
+sudo ufw deny 7484
+```
 
 ## Service Management
 
@@ -265,10 +181,6 @@ systemctl --user stop tui-browser
 systemctl --user restart tui-browser
 systemctl --user status tui-browser
 journalctl --user -u tui-browser -f    # tail logs
-
-# Cloudflare tunnel (if configured)
-systemctl --user start tui-browser-tunnel
-systemctl --user stop tui-browser-tunnel
 ```
 
 ## API
@@ -280,7 +192,6 @@ systemctl --user stop tui-browser-tunnel
 | `GET` | `/api/discover` | Unified discovery (tmux sessions + Kitty windows) |
 | `GET` | `/api/version` | Server version + build ID + claude availability |
 | `GET` | `/api/identity` | Server name + package version (for federation) |
-| `GET` | `/api/network` | Local IPs + HTTPS port for LAN fast-path |
 | `GET` | `/api/health` | Server + tmux + Kitty status |
 | `GET` | `/api/servers` | Multi-server configuration list |
 | `PUT` | `/api/servers` | Update server list `{ servers: [{ name, url }] }` |
@@ -348,7 +259,6 @@ tui-browser/
 │   ├── index.html            # SPA shell
 │   ├── js/
 │   │   ├── app.js            # Hash router, modal, toast, version polling
-│   │   ├── app-network.js    # Local network fast-path detection
 │   │   ├── server-manager.js # Multi-server connection manager + discovery aggregator
 │   │   ├── settings-panel.js # Server settings overlay (add/edit/remove servers)
 │   │   ├── dashboard.js      # Session cards, server groups, rendering, CRUD
@@ -418,14 +328,14 @@ Phone/Tablet/Laptop Browser              Machine A (primary)          Machine B 
 │  Dashboard               │            │  Node.js Server      │    │  Node.js Server      │
 │  ┌─ HOST ──────────────┐ │   HTTPS    │  ├── REST API        │    │  ├── REST API        │
 │  │ Sessions from A     │ │◄══════════►│  ├── WebSocket       │    │  ├── WebSocket       │
-│  └─────────────────────┘ │  tunnel /  │  ├── tmux discovery  │    │  ├── tmux discovery  │
-│  ┌─ LAPTOP ────────────┐ │   LAN      │  ├── serves frontend │    │  ├── /api/identity   │
-│  │ Sessions from B     │ │◄══════╦═══►│  ├── /api/servers    │    │  └── /api/update     │
-│  └─────────────────────┘ │       ║    │  └── session-manager │    └──────────────────────┘
+│  └─────────────────────┘ │ Tailscale  │  ├── tmux discovery  │    │  ├── tmux discovery  │
+│  ┌─ LAPTOP ────────────┐ │ WireGuard  │  ├── serves frontend │    │  ├── /api/identity   │
+│  │ Sessions from B     │ │ encrypted  │  ├── /api/servers    │    │  └── /api/update     │
+│  └─────────────────────┘ │◄══════╦═══►│  └── session-manager │    └──────────────────────┘
 │  Terminal View           │       ║    └──────────────────────┘               │
 │  ┌─────────────────────┐ │       ║               │                          ▼
 │  │ xterm.js — direct   │ │       ╚══════════════════════════►    ┌────────────────────┐
-│  │ WebSocket to B      │ │                       ▼               │ tmux sessions      │
+│  │ WireGuard to B      │ │                       ▼               │ tmux sessions      │
 │  └─────────────────────┘ │            ┌────────────────────┐    └────────────────────┘
 └──────────────────────────┘            │ tmux sessions      │
                                         └────────────────────┘
@@ -440,12 +350,11 @@ Phone/Tablet/Laptop Browser              Machine A (primary)          Machine B 
 
 ### Multi-Machine Federation
 
-Each machine runs its own independent tui-browser server. The primary server hosts the frontend SPA. The client (browser) connects directly to each server — no proxy or relay.
+Each machine runs its own independent tui-browser server. The primary server hosts the frontend SPA. The client (browser) connects directly to each server via Tailscale — no proxy or relay.
 
 - **HOST** group always shows the primary server's sessions
 - Additional servers are added via the settings panel (wrench icon)
-- The client fetches `/api/network` from each server to auto-discover LAN IPs
-- It races LAN IPs against the configured URL for the fastest connection per server
+- The client connects directly via Tailscale using the configured IP or MagicDNS hostname
 - Terminal WebSocket connects directly to the session's origin server
 - Version sync: when the primary's `package.json` version bumps, remote servers auto-pull and restart
 
@@ -458,59 +367,13 @@ Each machine runs its own independent tui-browser server. The primary server hos
    ./install.sh --server-name <name>   # use --primary on the main machine
    ```
 
-2. **Set up a Cloudflare Tunnel** so the primary can reach this machine over the internet:
+2. **Install Tailscale** and join the same network:
    ```bash
-   # On the new machine
-   cloudflared tunnel create tui-browser-<name>
-   cloudflared tunnel route dns tui-browser-<name> <name>.yourdomain.com
-
-   # Create config (~/.cloudflared/tui-browser.yml)
-   cat > ~/.cloudflared/tui-browser.yml << EOF
-   tunnel: <TUNNEL_ID>
-   credentials-file: ~/.cloudflared/<TUNNEL_ID>.json
-
-   ingress:
-     - hostname: <name>.yourdomain.com
-       service: http://localhost:7483
-     - service: http_status:404
-   EOF
-
-   # Set up systemd service and start
-   # (see "Remote Access" section above for the service file)
-   systemctl --user enable --now tui-browser-tunnel.service
+   # Install: https://tailscale.com/download
+   tailscale up
    ```
 
-3. **Add the server** in the primary's dashboard via the wrench icon, using the tunnel URL.
-
-#### Enabling Local Fast-Path Between Machines
-
-When machines are on the same LAN, the dashboard can bypass the Cloudflare tunnel and connect directly via HTTPS for lower latency. This requires two things:
-
-**Open firewall ports** on each machine (if a firewall is active):
-```bash
-# Example for firewalld (Arch/Fedora):
-sudo firewall-cmd --add-port=7483/tcp --add-port=7484/tcp --permanent
-sudo firewall-cmd --reload
-
-# Example for ufw (Ubuntu/Debian):
-sudo ufw allow 7483/tcp
-sudo ufw allow 7484/tcp
-```
-
-**Cross-trust mkcert CAs** — each machine's HTTPS cert is signed by its own mkcert CA. For the browser to accept the direct LAN connection, it needs to trust the remote machine's CA:
-```bash
-# On machine A, copy its CA to machine B and install:
-scp ~/.local/share/mkcert/rootCA.pem machineB:~/machineA-rootCA.pem
-ssh machineB 'sudo trust anchor --store ~/machineA-rootCA.pem'  # Arch/Fedora
-# Or on Ubuntu/Debian:
-# ssh machineB 'sudo cp ~/machineA-rootCA.pem /usr/local/share/ca-certificates/machineA.crt && sudo update-ca-certificates'
-
-# Do the reverse for machine B → machine A
-scp machineB:~/.local/share/mkcert/rootCA.pem ~/machineB-rootCA.pem
-sudo trust anchor --store ~/machineB-rootCA.pem
-```
-
-After this, both machines' browsers will trust each other's certs, and the local fast-path will automatically activate when they're on the same network (green house icon).
+3. **Add the server** in the primary's dashboard via the wrench icon, using the machine's Tailscale IP or MagicDNS hostname.
 
 ---
 
