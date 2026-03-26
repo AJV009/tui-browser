@@ -65,12 +65,6 @@ const Dashboard = (() => {
     DashboardBulkKill.init(deps);
     DashboardInfo.init(deps);
 
-    // Files button
-    const dashFilesBtn = document.getElementById('dashboard-files-btn');
-    if (dashFilesBtn) {
-      dashFilesBtn.addEventListener('click', () => FileBrowser.open());
-    }
-
     startAutoRefresh();
   }
 

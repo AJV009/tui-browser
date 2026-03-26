@@ -54,16 +54,6 @@ const TerminalControls = (() => {
       aiTitleBtn.classList.remove('loading');
     });
 
-    // Files button
-    const filesBtn = document.getElementById('files-toggle-btn');
-    if (filesBtn) {
-      filesBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const serverOrigin = ServerManager.isMultiServer() && App.getCurrentServer() ? ServerManager.getOrigin(App.getCurrentServer()) : '';
-        FileBrowser.open(null, serverOrigin); // Session-aware — will auto-detect CWD
-      });
-    }
 
     // Editable session name
     const nameLabel = document.getElementById('terminal-session-name');

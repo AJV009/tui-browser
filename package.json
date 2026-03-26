@@ -1,6 +1,6 @@
 {
   "name": "tui-browser",
-  "version": "3.0.14",
+  "version": "3.0.15",
   "description": "Browser-based terminal with remote control via tmux session management",
   "main": "server/index.js",
   "scripts": {
