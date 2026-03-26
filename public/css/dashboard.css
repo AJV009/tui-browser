@@ -281,8 +281,8 @@
 .kitty-icon { background: var(--kitty-dim); color: var(--kitty); }
 
 /* ========== Server Groups ========== */
-.server-group { grid-column: 1 / -1; margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px; }
-.server-group:first-child { margin-top: 0; border-top: none; padding-top: 0; }
+.server-group { grid-column: 1 / -1; margin-top: 0; border-top: 1px solid var(--border); padding-top: 12px; }
+.server-group:first-child { border-top: none; padding-top: 0; }
 .server-group-header {
   display: flex; align-items: center; justify-content: space-between;
   padding: 0 4px; margin-bottom: 10px;
