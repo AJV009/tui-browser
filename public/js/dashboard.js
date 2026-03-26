@@ -42,6 +42,7 @@ const Dashboard = (() => {
       else if (action === 'toggle-select') DashboardBulkKill.toggleSelect(btn.dataset.session);
       else if (action === 'toggle-lock') toggleLock(btn.dataset.session);
       else if (action === 'reconnect-server') ServerManager.reconnectServer(btn.dataset.server);
+      else if (action === 'server-files') FileBrowser.open(null, ServerManager.getOrigin(btn.dataset.server));
     });
 
     let lastTap = 0, lastTapSession = null;
@@ -195,6 +196,7 @@ const Dashboard = (() => {
   }
 
   const RECONNECT_SVG = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 8a5.5 5.5 0 0 1 9.3-4"/><path d="M13.5 8a5.5 5.5 0 0 1-9.3 4"/><path d="M11.5 1.5v3h3"/><path d="M4.5 14.5v-3h-3"/></svg>';
+  const FILES_SVG = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>';
 
   function renderMultiServer() {
     const list = document.getElementById('session-list');
@@ -232,8 +234,9 @@ const Dashboard = (() => {
       html += `</div>`;
       html += `<div class="server-group-right">`;
 
-      if (isOnline && state.mode) {
-        html += `<span class="server-group-mode">${state.mode}</span>`;
+      if (isOnline) {
+        html += `<button class="server-reconnect-btn" data-action="server-files" data-server="${esc(name)}" title="File Browser">${FILES_SVG}</button>`;
+        if (state.mode) html += `<span class="server-group-mode">${state.mode}</span>`;
       }
       if (!isOnline) {
         html += `<button class="server-reconnect-btn" data-action="reconnect-server" data-server="${esc(name)}" title="Reconnect">${RECONNECT_SVG}</button>`;

@@ -60,7 +60,8 @@ const TerminalControls = (() => {
       filesBtn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        FileBrowser.open(); // Session-aware — will auto-detect CWD
+        const serverOrigin = ServerManager.isMultiServer() && App.getCurrentServer() ? ServerManager.getOrigin(App.getCurrentServer()) : '';
+        FileBrowser.open(null, serverOrigin); // Session-aware — will auto-detect CWD
       });
     }
 

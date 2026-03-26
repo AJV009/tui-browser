@@ -20,6 +20,7 @@ const FileBrowser = (() => {
   let _showHidden = false;
   let _contextTarget = null;
   let _originView = 'dashboard'; // 'dashboard' or 'terminal'
+  let _serverOrigin = ''; // server origin for multi-server mode
 
   // DOM references (set in init)
   let $overlay, $breadcrumb, $fileList, $selectionBar, $contextMenu, $contextBackdrop;
@@ -58,8 +59,9 @@ const FileBrowser = (() => {
     if (dpMkdirBtn) dpMkdirBtn.addEventListener('click', () => DirPicker.mkdir());
   }
 
-  async function open(initialPath) {
+  async function open(initialPath, serverOrigin) {
     _originView = window.location.hash.includes('terminal') ? 'terminal' : 'dashboard';
+    _serverOrigin = serverOrigin || '';
     const targetPath = initialPath || await getDefaultPath();
     _currentPath = targetPath;
     _history = [];
@@ -80,7 +82,7 @@ const FileBrowser = (() => {
   // ---------- API Helper ----------
 
   async function api(endpoint, body = {}) {
-    const res = await fetch(`/api/files/${endpoint}`, {
+    const res = await fetch(`${_serverOrigin}/api/files/${endpoint}`, {
       method: endpoint === 'cwd' ? 'GET' : 'POST',
       headers: endpoint === 'cwd' ? {} : { 'Content-Type': 'application/json' },
       body: endpoint === 'cwd' ? undefined : JSON.stringify(body),
@@ -100,7 +102,7 @@ const FileBrowser = (() => {
       const sessionName = hash.split('/').slice(1).join('/');
       if (sessionName) {
         try {
-          const res = await fetch(`/api/files/cwd?session=${encodeURIComponent(sessionName)}`);
+          const res = await fetch(`${_serverOrigin}/api/files/cwd?session=${encodeURIComponent(sessionName)}`);
           const data = await res.json();
           if (data.path) return data.path;
         } catch {}
@@ -108,7 +110,7 @@ const FileBrowser = (() => {
     }
     // Fallback: home directory
     try {
-      const cwdRes = await fetch('/api/files/cwd?session=_');
+      const cwdRes = await fetch(`${_serverOrigin}/api/files/cwd?session=_`);
       const data = await cwdRes.json();
       return data.path; // Falls back to $HOME on server
     } catch {
@@ -514,7 +516,7 @@ const FileBrowser = (() => {
   }
 
   function downloadFile(filePath) {
-    const url = '/api/files/download?path=' + encodeURIComponent(filePath);
+    const url = `${_serverOrigin}/api/files/download?path=` + encodeURIComponent(filePath);
     const a = document.createElement('a');
     a.href = url;
     a.download = filePath.split('/').pop();
