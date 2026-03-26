@@ -230,7 +230,7 @@ const TerminalView = (() => {
 
   // ---------- WebSocket Connection ----------
 
-  function connect(sessionName) {
+  function connect(sessionName, serverName) {
     // Lightweight cleanup — preserves UI state (text input panel, quickbar, scroll mode)
     if (heartbeatInterval) { clearInterval(heartbeatInterval); heartbeatInterval = null; }
     TerminalControls.stopScrolling();
@@ -241,7 +241,7 @@ const TerminalView = (() => {
     setStatus('connecting', 'Connecting\u2026');
     term.clear();
 
-    try { ws = new WebSocket(App.getWsUrl(sessionName)); }
+    try { ws = new WebSocket(App.getWsUrl(sessionName, serverName)); }
     catch {
       setStatus('error', 'Failed to connect');
       const pending = connectResolvers.splice(0);

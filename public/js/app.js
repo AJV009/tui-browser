@@ -3,11 +3,12 @@
  * Network probing is in app-network.js (AppNetwork).
  */
 
-/* global Dashboard, TerminalView, AppNetwork, FileBrowser, FileEditor, FileUpload */
+/* global Dashboard, TerminalView, AppNetwork, FileBrowser, FileEditor, FileUpload, ServerManager */
 
 const App = (() => {
   let currentView = 'dashboard';
   let currentSession = null;
+  let currentServer = null;
 
   const views = {
     dashboard: () => document.getElementById('dashboard-view'),
@@ -17,7 +18,11 @@ const App = (() => {
 
   function navigate(view, params = {}) {
     if (view === 'terminal' && params.session) {
-      window.location.hash = `#terminal/${encodeURIComponent(params.session)}`;
+      if (params.server) {
+        window.location.hash = `#terminal/${encodeURIComponent(params.server)}/${encodeURIComponent(params.session)}`;
+      } else {
+        window.location.hash = `#terminal/${encodeURIComponent(params.session)}`;
+      }
     } else {
       window.location.hash = '#dashboard';
     }
@@ -41,19 +46,29 @@ const App = (() => {
     }
 
     if (view === 'terminal' && parts[1]) {
-      const sessionName = decodeURIComponent(parts[1]);
+      let sessionName, serverName;
+      if (parts.length >= 3) {
+        serverName = decodeURIComponent(parts[1]);
+        sessionName = decodeURIComponent(parts[2]);
+      } else {
+        sessionName = decodeURIComponent(parts[1]);
+        serverName = null;
+      }
       currentView = 'terminal';
       currentSession = sessionName;
+      currentServer = serverName || null;
       views.terminal().classList.remove('hidden');
       backBtn.style.display = 'inline-flex';
       document.getElementById('terminal-session-name').textContent = sessionName;
-      TerminalView.connect(sessionName);
-      fetch(`/api/sessions/${encodeURIComponent(sessionName)}`).then(r => r.json()).then(d => {
+      TerminalView.connect(sessionName, serverName);
+      const origin = serverName ? ServerManager.getOrigin(serverName) : '';
+      fetch(`${origin}/api/sessions/${encodeURIComponent(sessionName)}`).then(r => r.json()).then(d => {
         if (d.displayTitle) document.getElementById('terminal-session-name').textContent = d.displayTitle;
       }).catch(() => {});
     } else {
       currentView = 'dashboard';
       currentSession = null;
+      currentServer = null;
       views.dashboard().classList.remove('hidden');
       backBtn.style.display = 'none';
       clearOverlayStack();
@@ -208,6 +223,11 @@ const App = (() => {
     document.getElementById('back-btn').addEventListener('click', () => navigate('dashboard'));
 
     Dashboard.init();
+    ServerManager.init(() => {});
+    // Set primary version for sync
+    fetch('/api/version').then(r => r.json()).then(d => {
+      ServerManager.setPrimaryVersion(d.version);
+    }).catch(() => {});
     TerminalView.init();
     TerminalNotes.initNotesOverlay();
     FileBrowser.init();
@@ -228,9 +248,15 @@ const App = (() => {
   return {
     init, navigate, showModal, showToast, getModalElements,
     pushOverlay, popOverlay,
-    getWsUrl: (...args) => AppNetwork.getWsUrl(...args),
+    getWsUrl: (sessionName, serverName) => {
+      if (serverName && ServerManager.isMultiServer()) {
+        return ServerManager.getWsUrl(serverName, sessionName);
+      }
+      return AppNetwork.getWsUrl(sessionName);
+    },
     onNetworkChange: () => AppNetwork.onNetworkChange(),
     getCurrentSession: () => currentSession,
+    getCurrentServer: () => currentServer,
     getLocalOrigin: () => AppNetwork.getLocalOrigin(),
   };
 })();
