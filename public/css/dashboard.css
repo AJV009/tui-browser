@@ -275,7 +275,12 @@
   display: flex; align-items: center; justify-content: space-between;
   padding: 0 4px; margin-bottom: 10px;
 }
+.server-group-header { cursor: pointer; }
+.server-group-header:hover .server-group-name { opacity: 0.8; }
 .server-group-header-left { display: flex; align-items: center; gap: 8px; }
+.server-group-chevron {
+  font-size: 10px; color: var(--text-muted); width: 12px; flex-shrink: 0;
+}
 .server-group-name {
   font-family: var(--mono); font-size: 12px; font-weight: 600;
   color: var(--accent); text-transform: uppercase; letter-spacing: 1px;

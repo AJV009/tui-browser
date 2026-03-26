@@ -42,7 +42,8 @@ const Dashboard = (() => {
       else if (action === 'toggle-select') DashboardBulkKill.toggleSelect(btn.dataset.session);
       else if (action === 'toggle-lock') toggleLock(btn.dataset.session);
       else if (action === 'reconnect-server') ServerManager.reconnectServer(btn.dataset.server);
-      else if (action === 'server-files') FileBrowser.open(null, ServerManager.getOrigin(btn.dataset.server));
+      else if (action === 'server-files') { e.stopPropagation(); FileBrowser.open(null, ServerManager.getOrigin(btn.dataset.server)); }
+      else if (action === 'toggle-collapse') { const n = btn.dataset.server; setCollapsed(n, !getCollapsed()[n]); renderMultiServer(); }
     });
 
     let lastTap = 0, lastTapSession = null;
@@ -70,37 +71,14 @@ const Dashboard = (() => {
       dashFilesBtn.addEventListener('click', () => FileBrowser.open());
     }
 
-    renderFromCache();
     startAutoRefresh();
   }
 
   // ---------- Data ----------
 
   async function refresh() {
-    if (ServerManager.isMultiServer()) {
-      await ServerManager.discoverAll();
-      renderMultiServer();
-    } else {
-      try {
-        const res = await fetch('/api/discover');
-        if (!res.ok) throw new Error(res.statusText);
-        const data = await res.json();
-        lastSessions = data.sessions || [];
-        lastUnmatchedKitty = data.unmatchedKitty || [];
-        try { localStorage.setItem('tui_sessions_cache', JSON.stringify({ sessions: lastSessions, unmatchedKitty: lastUnmatchedKitty })); } catch {}
-        render(lastSessions, lastUnmatchedKitty);
-        if (!App.getLocalOrigin()) App.onNetworkChange();
-      } catch {
-        if (!lastSessions) renderError('Connecting\u2026');
-      }
-    }
-  }
-
-  function renderFromCache() {
-    try {
-      const cached = JSON.parse(localStorage.getItem('tui_sessions_cache'));
-      if (cached && cached.sessions) { lastSessions = cached.sessions; lastUnmatchedKitty = cached.unmatchedKitty || []; render(lastSessions, lastUnmatchedKitty); }
-    } catch {}
+    await ServerManager.discoverAll();
+    renderMultiServer();
   }
 
   function startAutoRefresh() {
@@ -112,32 +90,7 @@ const Dashboard = (() => {
 
   // ---------- Rendering ----------
 
-  function render(sessions, unmatchedKitty) {
-    const connMode = document.getElementById('connection-mode');
-    if (connMode) connMode.style.display = '';
-    const list = document.getElementById('session-list');
-    if (sessions.length === 0 && unmatchedKitty.length === 0) {
-      list.innerHTML = '<div class="empty-state"><h3>No sessions found</h3><p>Create a new tmux session to get started.</p></div>';
-      return;
-    }
-    const sorted = [...sessions].sort((a, b) => {
-      switch (sortMode) {
-        case 'recent': return b.created - a.created;
-        case 'oldest': return a.created - b.created;
-        case 'active': return (b.lastActivity || 0) - (a.lastActivity || 0);
-        case 'idle': return (a.lastActivity || 0) - (b.lastActivity || 0);
-        default: return 0;
-      }
-    });
-    let html = sorted.map(renderSessionCard).join('');
-    if (unmatchedKitty.length > 0) html += renderUnmatchedKitty(unmatchedKitty);
-    list.innerHTML = html;
-    const currentNames = new Set(sessions.map(s => s.name));
-    for (const name of selectedSessions) { if (!currentNames.has(name)) selectedSessions.delete(name); }
-    DashboardBulkKill.updateButton();
-  }
-
-  function renderSessionCard(s, multiServer) {
+  function renderSessionCard(s) {
     const pane = s.panes && s.panes[0];
     const cmd = pane ? pane.command : 'unknown';
     const paneTitle = pane && pane.title ? pane.title : '';
@@ -202,31 +155,41 @@ const Dashboard = (() => {
   const LOCAL_SVG = '<svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="#00e5a0" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 7.5L8 2l6 5.5"/><path d="M3.5 6.5V14H7v-4h2v4h3.5V6.5"/></svg>';
   const TUNNEL_SVG = '<svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="#fb923c" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6.5"/><path d="M1.5 8h13M8 1.5c-2 2-3 4-3 6.5s1 4.5 3 6.5M8 1.5c2 2 3 4 3 6.5s-1 4.5-3 6.5"/></svg>';
 
+  // Collapsed state per server group (persisted in localStorage)
+  function getCollapsed() {
+    try { return JSON.parse(localStorage.getItem('tui_collapsed_groups') || '{}'); } catch { return {}; }
+  }
+  function setCollapsed(name, collapsed) {
+    const state = getCollapsed();
+    if (collapsed) state[name] = true; else delete state[name];
+    localStorage.setItem('tui_collapsed_groups', JSON.stringify(state));
+  }
+
   function renderMultiServer() {
     const list = document.getElementById('session-list');
     const connMode = document.getElementById('connection-mode');
     if (connMode) connMode.style.display = 'none';
     const states = ServerManager.getServerStates();
-    const serverNames = Object.keys(states);
-
-    if (serverNames.length === 0) {
-      list.innerHTML = '<div class="empty-state"><h3>No servers configured</h3><p>Add servers in the settings panel.</p></div>';
-      return;
-    }
+    // Ensure HOST is always first
+    const serverNames = ['HOST', ...Object.keys(states).filter(n => n !== 'HOST')];
+    const collapsed = getCollapsed();
 
     let html = '';
     let totalSessions = 0;
 
     for (const name of serverNames) {
       const state = states[name];
+      if (!state) continue;
       const isOnline = state.online;
       const isUpdating = state.updating;
       const sessions = state.sessions || [];
+      const isCollapsed = !!collapsed[name];
       totalSessions += sessions.length;
 
-      html += `<div class="server-group${isOnline ? '' : ' offline'}">`;
-      html += `<div class="server-group-header">`;
+      html += `<div class="server-group${isOnline ? '' : ' offline'}${isCollapsed ? ' collapsed' : ''}">`;
+      html += `<div class="server-group-header" data-action="toggle-collapse" data-server="${esc(name)}">`;
       html += `<div class="server-group-header-left">`;
+      html += `<span class="server-group-chevron">${isCollapsed ? '\u25B6' : '\u25BC'}</span>`;
       html += `<span class="server-group-name">${esc(name)}</span>`;
       if (isOnline && state.mode) {
         html += `<span class="server-group-mode-icon" title="${state.mode === 'local' ? 'Local network (LAN)' : 'Internet'}">${state.mode === 'local' ? LOCAL_SVG : TUNNEL_SVG}</span>`;
@@ -252,7 +215,7 @@ const Dashboard = (() => {
 
       html += `</div></div>`;
 
-      if (isOnline && sessions.length > 0) {
+      if (!isCollapsed && isOnline && sessions.length > 0) {
         const sorted = [...sessions].sort((a, b) => {
           switch (sortMode) {
             case 'recent': return b.created - a.created;
@@ -263,14 +226,14 @@ const Dashboard = (() => {
           }
         });
         html += `<div class="server-group-sessions">`;
-        html += sorted.map(s => renderSessionCard(s, true)).join('');
+        html += sorted.map(s => renderSessionCard(s)).join('');
         html += `</div>`;
       }
 
       html += `</div>`;
     }
 
-    if (totalSessions === 0 && serverNames.every(n => states[n].online)) {
+    if (totalSessions === 0 && serverNames.every(n => states[n] && states[n].online)) {
       html += '<div class="empty-state"><h3>No sessions found</h3><p>Create a new tmux session on any server to get started.</p></div>';
     }
 
@@ -287,13 +250,7 @@ const Dashboard = (() => {
     const name = nameInput.value.trim(), command = cmdInput.value.trim() || 'bash';
     if (!name) { nameInput.focus(); return; }
     try {
-      let origin = '';
-      if (ServerManager.isMultiServer()) {
-        const states = ServerManager.getServerStates();
-        const firstOnline = Object.values(states).find(s => s.online);
-        if (firstOnline) origin = firstOnline.origin;
-      }
-      const res = await fetch(`${origin}/api/sessions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, command }) });
+      const res = await fetch('/api/sessions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, command }) });
       if (!res.ok) { const err = await res.json(); await App.showModal(err.error || 'Failed to create session', 'OK'); return; }
       nameInput.value = ''; cmdInput.value = '';
       await refresh();

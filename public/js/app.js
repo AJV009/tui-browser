@@ -224,8 +224,8 @@ const App = (() => {
 
     Dashboard.init();
     ServerManager.init(() => {});
-    // Set primary version for sync
-    fetch('/api/version').then(r => r.json()).then(d => {
+    // Set primary version for sync (use /api/identity which returns stable pkg version, not build ID)
+    fetch('/api/identity').then(r => r.json()).then(d => {
       ServerManager.setPrimaryVersion(d.version);
     }).catch(() => {});
     TerminalView.init();

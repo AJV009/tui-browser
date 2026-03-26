@@ -25,14 +25,24 @@ const ServerManager = (() => {
       servers = [];
     }
 
-    if (servers.length === 0) {
-      // No multi-server config — run in single-server mode (backwards compatible)
-      serverStates = {};
-      return;
+    // Always include HOST as the local server
+    if (!serverStates['HOST']) {
+      serverStates['HOST'] = {
+        config: { name: 'HOST', url: '' },
+        origin: '',  // empty string = same origin (local fetch)
+        mode: 'local',
+        online: true,
+        version: null,
+        updating: false,
+        sessions: [],
+        unmatchedKitty: [],
+        isHost: true,
+      };
     }
 
-    // Initialize state for each server
+    // Initialize state for each remote server
     for (const s of servers) {
+      if (s.name === 'HOST') continue; // skip if someone named a server HOST
       if (!serverStates[s.name]) {
         serverStates[s.name] = {
           config: s,
@@ -49,18 +59,18 @@ const ServerManager = (() => {
       }
     }
 
-    // Remove states for servers no longer in config
-    const nameSet = new Set(servers.map(s => s.name));
+    // Remove states for servers no longer in config (but never remove HOST)
+    const nameSet = new Set(['HOST', ...servers.map(s => s.name)]);
     for (const name of Object.keys(serverStates)) {
       if (!nameSet.has(name)) delete serverStates[name];
     }
 
-    // Resolve connections for all servers
+    // Resolve connections for remote servers only (HOST is always local)
     await resolveAll();
   }
 
   function isMultiServer() {
-    return servers.length > 0;
+    return true; // always grouped view now
   }
 
   function getServers() {
@@ -142,7 +152,7 @@ const ServerManager = (() => {
 
   async function resolveAll() {
     await Promise.allSettled(
-      Object.values(serverStates).map(state => resolveServer(state))
+      Object.values(serverStates).filter(s => !s.isHost).map(state => resolveServer(state))
     );
   }
 
@@ -157,7 +167,7 @@ const ServerManager = (() => {
   // ---------- Discovery Aggregation ----------
 
   async function discoverServer(state) {
-    if (!state.online || !state.origin) {
+    if (!state.online || (state.origin == null && !state.isHost)) {
       state.sessions = [];
       state.unmatchedKitty = [];
       return;
@@ -198,6 +208,7 @@ const ServerManager = (() => {
   function checkVersionSync() {
     if (!primaryVersion) return;
     for (const state of Object.values(serverStates)) {
+      if (state.isHost) continue; // never self-update
       if (state.online && state.version && state.version !== primaryVersion && !state.updating) {
         triggerUpdate(state);
       }
