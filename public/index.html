@@ -50,6 +50,10 @@
             <input id="new-session-name" type="text" placeholder="Session name" autocomplete="off">
             <input id="new-session-cmd" type="text" placeholder="Command (default: bash)" autocomplete="off">
             <div class="create-form-actions">
+              <div id="server-picker-dropdown" class="shortcuts-dropdown">
+                <button id="server-picker-btn" class="btn btn-secondary" type="button"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="12" height="5" rx="1"/><rect x="2" y="9" width="12" height="5" rx="1"/><circle cx="5" cy="4.5" r="0.8" fill="currentColor"/><circle cx="5" cy="11.5" r="0.8" fill="currentColor"/></svg> <span id="server-picker-label">HOST</span></button>
+                <div id="server-picker-menu" class="shortcuts-menu hidden"></div>
+              </div>
               <div id="shortcuts-dropdown" class="shortcuts-dropdown">
                 <button id="shortcuts-btn" class="btn btn-secondary" type="button"><svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><path d="M7.5 1L3 8h3.5L5.5 13 11 6H7.5z"/></svg> Quick Launch</button>
                 <div id="shortcuts-menu" class="shortcuts-menu hidden"></div>

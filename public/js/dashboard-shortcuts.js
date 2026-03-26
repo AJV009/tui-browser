@@ -16,6 +16,7 @@ const DashboardShortcuts = (() => {
     const menu = document.getElementById('shortcuts-menu');
 
     loadAllShortcuts();
+    initServerPicker();
 
     backdrop = document.createElement('div');
     backdrop.className = 'shortcuts-backdrop hidden';
@@ -243,15 +244,76 @@ const DashboardShortcuts = (() => {
 
   // Track which server the next session create should target
   let _targetServer = 'HOST';
+  let pickerBackdrop = null;
 
   function getTargetServer() { return _targetServer; }
+
+  function setTargetServer(name) {
+    _targetServer = name;
+    const label = document.getElementById('server-picker-label');
+    if (label) label.textContent = name;
+  }
+
+  function initServerPicker() {
+    const btn = document.getElementById('server-picker-btn');
+    const menu = document.getElementById('server-picker-menu');
+    if (!btn || !menu) return;
+
+    pickerBackdrop = document.createElement('div');
+    pickerBackdrop.className = 'shortcuts-backdrop hidden';
+    document.body.appendChild(pickerBackdrop);
+    document.body.appendChild(menu);
+
+    btn.addEventListener('click', () => {
+      if (!menu.classList.contains('hidden')) { closePicker(); return; }
+      rebuildServerPicker();
+      openPicker(btn, menu);
+    });
+
+    pickerBackdrop.addEventListener('click', closePicker);
+
+    menu.addEventListener('click', (e) => {
+      const item = e.target.closest('.shortcut-item');
+      if (!item) return;
+      closePicker();
+      setTargetServer(item.dataset.server);
+    });
+  }
+
+  function rebuildServerPicker() {
+    const menu = document.getElementById('server-picker-menu');
+    const esc = _deps.esc;
+    const servers = getServerNames();
+    menu.innerHTML = servers.map(name => `
+      <div class="shortcut-item${name === _targetServer ? ' shortcut-active' : ''}" data-server="${esc(name)}">
+        <span class="shortcut-label">${esc(name)}</span>
+      </div>`).join('');
+  }
+
+  function openPicker(btn, menu) {
+    if (window.innerWidth > 768) {
+      const rect = btn.getBoundingClientRect();
+      menu.style.top = (rect.bottom + 4) + 'px';
+      menu.style.right = (window.innerWidth - rect.right) + 'px';
+      menu.style.left = '';
+      menu.style.bottom = '';
+    }
+    pickerBackdrop.classList.remove('hidden');
+    menu.classList.remove('hidden');
+  }
+
+  function closePicker() {
+    const menu = document.getElementById('server-picker-menu');
+    if (menu) menu.classList.add('hidden');
+    if (pickerBackdrop) pickerBackdrop.classList.add('hidden');
+  }
 
   function prefill(shortcut, serverName) {
     const base = shortcut.label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
     const name = base + '-' + Date.now().toString(36).slice(-4);
     document.getElementById('new-session-name').value = name;
     document.getElementById('new-session-cmd').value = shortcut.command;
-    _targetServer = serverName || 'HOST';
+    setTargetServer(serverName || 'HOST');
     document.getElementById('new-session-cmd').focus();
   }
 

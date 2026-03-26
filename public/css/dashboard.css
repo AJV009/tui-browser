@@ -110,6 +110,8 @@
   border-top: 1px solid var(--border);
 }
 .shortcut-group-header:first-child { border-top: none; }
+.shortcut-active { background: var(--accent-dim) !important; }
+.shortcut-active .shortcut-label { color: var(--accent) !important; }
 .shortcut-server-tag {
   font-size: 9px; color: var(--text-muted); margin-left: 6px;
   text-transform: uppercase; letter-spacing: 0.5px;
