@@ -183,20 +183,30 @@ function setup(app, { discovery, sessions, kittyDiscovery, state, aiTitles, conf
 
   // ---------- Shortcuts / Titles / Rename / Lock ----------
 
-  const shortcutsPath = path.join(__dirname, '..', 'public', 'shortcuts.json');
-  const shortcutsSamplePath = path.join(__dirname, '..', 'public', 'shortcuts.sample.json');
+  const shortcutsPath = path.join(dataDir, 'shortcuts.json');
+  const shortcutsSamplePath = path.join(dataDir, 'shortcuts.sample.json');
   if (!fs.existsSync(shortcutsPath) && fs.existsSync(shortcutsSamplePath)) {
     fs.copyFileSync(shortcutsSamplePath, shortcutsPath);
   }
 
+  function readShortcuts() {
+    try { return JSON.parse(fs.readFileSync(shortcutsPath, 'utf8')); } catch { return []; }
+  }
+  function writeShortcuts(shortcuts) {
+    fs.writeFileSync(shortcutsPath, JSON.stringify(shortcuts, null, 2));
+  }
+
+  app.get('/api/shortcuts', (_req, res) => {
+    res.json(readShortcuts());
+  });
+
   app.post('/api/shortcuts', apiHandler(async (req, res) => {
     const { label, command } = req.body || {};
     if (!label || !command) return res.status(400).json({ error: 'label and command required' });
-    let shortcuts = [];
-    try { shortcuts = JSON.parse(fs.readFileSync(shortcutsPath, 'utf8')); } catch { /* empty */ }
+    const shortcuts = readShortcuts();
     if (shortcuts.some(s => s.label === label && s.command === command)) return res.json({ shortcuts });
     shortcuts.push({ label, command });
-    fs.writeFileSync(shortcutsPath, JSON.stringify(shortcuts, null, 2));
+    writeShortcuts(shortcuts);
     res.json({ shortcuts });
   }));
 
@@ -204,21 +214,19 @@ function setup(app, { discovery, sessions, kittyDiscovery, state, aiTitles, conf
     const idx = parseInt(req.params.index, 10);
     const { label, command } = req.body || {};
     if (!label || !command) return res.status(400).json({ error: 'label and command required' });
-    let shortcuts = [];
-    try { shortcuts = JSON.parse(fs.readFileSync(shortcutsPath, 'utf8')); } catch { /* empty */ }
+    const shortcuts = readShortcuts();
     if (idx < 0 || idx >= shortcuts.length) return res.status(404).json({ error: 'shortcut not found' });
     shortcuts[idx] = { label, command };
-    fs.writeFileSync(shortcutsPath, JSON.stringify(shortcuts, null, 2));
+    writeShortcuts(shortcuts);
     res.json({ shortcuts });
   }));
 
   app.delete('/api/shortcuts/:index', apiHandler(async (req, res) => {
     const idx = parseInt(req.params.index, 10);
-    let shortcuts = [];
-    try { shortcuts = JSON.parse(fs.readFileSync(shortcutsPath, 'utf8')); } catch { /* empty */ }
+    const shortcuts = readShortcuts();
     if (idx < 0 || idx >= shortcuts.length) return res.status(404).json({ error: 'shortcut not found' });
     shortcuts.splice(idx, 1);
-    fs.writeFileSync(shortcutsPath, JSON.stringify(shortcuts, null, 2));
+    writeShortcuts(shortcuts);
     res.json({ shortcuts });
   }));
 

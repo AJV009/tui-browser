@@ -4,5 +4,6 @@ package-lock.json
 docs/prompt.txt
 certs/
 data/
+!data/shortcuts.sample.json
 public/shortcuts.json
 public/icons/

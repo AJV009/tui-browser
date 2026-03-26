@@ -104,6 +104,16 @@
 .shortcut-edit-btn:hover { color: var(--accent); background: var(--surface); }
 .shortcut-custom { border-top: 1px solid var(--border-hover); }
 .shortcut-custom .shortcut-label { color: var(--accent); }
+.shortcut-group-header {
+  font-family: var(--mono); font-size: 10px; font-weight: 600; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 1px; padding: 8px 14px 4px;
+  border-top: 1px solid var(--border);
+}
+.shortcut-group-header:first-child { border-top: none; }
+.shortcut-server-tag {
+  font-size: 9px; color: var(--text-muted); margin-left: 6px;
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
 
 /* ========== Create Session Form ========== */
 .create-form { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
