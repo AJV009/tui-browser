@@ -250,9 +250,7 @@ const App = (() => {
     init, navigate, showModal, showToast, getModalElements,
     pushOverlay, popOverlay,
     getWsUrl: (sessionName, serverName) => {
-      if (serverName && ServerManager.isMultiServer()) {
-        return ServerManager.getWsUrl(serverName, sessionName);
-      }
+      if (serverName) return ServerManager.getWsUrl(serverName, sessionName);
       return AppNetwork.getWsUrl(sessionName);
     },
     onNetworkChange: () => AppNetwork.onNetworkChange(),

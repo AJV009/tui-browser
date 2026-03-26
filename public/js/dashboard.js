@@ -272,9 +272,7 @@ const Dashboard = (() => {
   }
 
   async function kill(sessionName, serverName) {
-    const sessions = ServerManager.isMultiServer()
-      ? Object.values(ServerManager.getServerStates()).flatMap(s => s.sessions)
-      : (lastSessions || []);
+    const sessions = Object.values(ServerManager.getServerStates()).flatMap(s => s.sessions);
     const s = sessions.find(x => x.name === sessionName && (!serverName || x._server === serverName));
     if (s && s.locked) return;
     const label = serverName ? `${serverName}:${sessionName}` : sessionName;
