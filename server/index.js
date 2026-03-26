@@ -61,6 +61,8 @@ routes.setup(app, {
 fileRoutes.setup(app);
 const serversConfig = require('./servers');
 serversConfig.setupRoutes(app);
+const selfUpdate = require('./update');
+selfUpdate.setupRoutes(app);
 
 // ---------- AI Auto-Title Loop ----------
 
