@@ -127,6 +127,7 @@ body {
 #header #contrast-btn { display: inline-flex; }
 #header #files-toggle-btn { display: inline-flex; }
 #header #notes-toggle-btn { display: inline-flex; }
+#header #settings-btn { display: inline-flex; }
 #header #notes-toggle-btn.active { background: var(--accent-dim); color: var(--accent); border-color: var(--accent); }
 
 /* ========== Toast ========== */
