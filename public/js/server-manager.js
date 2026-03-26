@@ -282,8 +282,15 @@ const ServerManager = (() => {
 
   function getWsUrl(serverName, sessionName) {
     const state = serverStates[serverName];
-    if (!state || !state.origin) return null;
-    const wsOrigin = state.origin.replace(/^http/, 'ws');
+    if (!state) return null;
+    let origin = state.origin;
+    if (!origin && state.isHost) {
+      // HOST with empty origin — use current page location
+      const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      return `${proto}//${window.location.host}/ws/terminal/${encodeURIComponent(sessionName)}`;
+    }
+    if (!origin) return null;
+    const wsOrigin = origin.replace(/^http/, 'ws');
     return `${wsOrigin}/ws/terminal/${encodeURIComponent(sessionName)}`;
   }
 
