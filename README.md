@@ -449,6 +449,69 @@ Each machine runs its own independent tui-browser server. The primary server hos
 - Terminal WebSocket connects directly to the session's origin server
 - Version sync: when the primary's `package.json` version bumps, remote servers auto-pull and restart
 
+#### Setting Up a New Machine
+
+1. **Install tui-browser** on the new machine:
+   ```bash
+   git clone git@github.com:AJV009/tui-browser.git
+   cd tui-browser
+   ./install.sh --server-name <name>   # use --primary on the main machine
+   ```
+
+2. **Set up a Cloudflare Tunnel** so the primary can reach this machine over the internet:
+   ```bash
+   # On the new machine
+   cloudflared tunnel create tui-browser-<name>
+   cloudflared tunnel route dns tui-browser-<name> <name>.yourdomain.com
+
+   # Create config (~/.cloudflared/tui-browser.yml)
+   cat > ~/.cloudflared/tui-browser.yml << EOF
+   tunnel: <TUNNEL_ID>
+   credentials-file: ~/.cloudflared/<TUNNEL_ID>.json
+
+   ingress:
+     - hostname: <name>.yourdomain.com
+       service: http://localhost:7483
+     - service: http_status:404
+   EOF
+
+   # Set up systemd service and start
+   # (see "Remote Access" section above for the service file)
+   systemctl --user enable --now tui-browser-tunnel.service
+   ```
+
+3. **Add the server** in the primary's dashboard via the wrench icon, using the tunnel URL.
+
+#### Enabling Local Fast-Path Between Machines
+
+When machines are on the same LAN, the dashboard can bypass the Cloudflare tunnel and connect directly via HTTPS for lower latency. This requires two things:
+
+**Open firewall ports** on each machine (if a firewall is active):
+```bash
+# Example for firewalld (Arch/Fedora):
+sudo firewall-cmd --add-port=7483/tcp --add-port=7484/tcp --permanent
+sudo firewall-cmd --reload
+
+# Example for ufw (Ubuntu/Debian):
+sudo ufw allow 7483/tcp
+sudo ufw allow 7484/tcp
+```
+
+**Cross-trust mkcert CAs** — each machine's HTTPS cert is signed by its own mkcert CA. For the browser to accept the direct LAN connection, it needs to trust the remote machine's CA:
+```bash
+# On machine A, copy its CA to machine B and install:
+scp ~/.local/share/mkcert/rootCA.pem machineB:~/machineA-rootCA.pem
+ssh machineB 'sudo trust anchor --store ~/machineA-rootCA.pem'  # Arch/Fedora
+# Or on Ubuntu/Debian:
+# ssh machineB 'sudo cp ~/machineA-rootCA.pem /usr/local/share/ca-certificates/machineA.crt && sudo update-ca-certificates'
+
+# Do the reverse for machine B → machine A
+scp machineB:~/.local/share/mkcert/rootCA.pem ~/machineB-rootCA.pem
+sudo trust anchor --store ~/machineB-rootCA.pem
+```
+
+After this, both machines' browsers will trust each other's certs, and the local fast-path will automatically activate when they're on the same network (green house icon).
+
 ---
 
 ## Why Not Just SSH?

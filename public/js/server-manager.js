@@ -127,8 +127,8 @@ const ServerManager = (() => {
     const networkInfo = await fetchNetworkInfo(baseUrl);
     if (networkInfo && networkInfo.localIPs && networkInfo.httpsPort) {
       state.localIPs = networkInfo.localIPs;
-      // Race local IPs for a faster connection
-      const localOrigins = ['127.0.0.1', ...networkInfo.localIPs].map(ip => `https://${ip}:${networkInfo.httpsPort}`);
+      // Race local IPs for a faster connection (no 127.0.0.1 — it resolves to the browser's machine, not the remote server)
+      const localOrigins = networkInfo.localIPs.map(ip => `https://${ip}:${networkInfo.httpsPort}`);
       try {
         const fastest = await Promise.any(
           localOrigins.map(async (origin) => {
