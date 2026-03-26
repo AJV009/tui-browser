@@ -486,4 +486,4 @@ TUI Browser sits in a unique spot: it's a **personal terminal dashboard** that m
 
 ## License
 
-MIT
+[AGPL-3.0](LICENSE) — free to use, modify, and distribute. If you modify it and offer it as a network service, you must open-source your modifications under the same license.
