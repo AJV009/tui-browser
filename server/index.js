@@ -59,6 +59,8 @@ routes.setup(app, {
   config: { PORT, HTTPS_PORT, FULL_VERSION, BUILD_ID },
 });
 fileRoutes.setup(app);
+const serversConfig = require('./servers');
+serversConfig.setupRoutes(app);
 
 // ---------- AI Auto-Title Loop ----------
 
