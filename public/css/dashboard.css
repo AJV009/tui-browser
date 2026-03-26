@@ -283,8 +283,8 @@
 .server-group-count {
   font-family: var(--mono); font-size: 11px; color: var(--text-muted);
 }
-.server-group-mode {
-  font-size: 10px; color: var(--text-muted); font-family: var(--mono);
+.server-group-mode-icon {
+  display: inline-flex; align-items: center;
 }
 .server-group-sessions {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 8px;
