@@ -13,6 +13,18 @@ warn()  { echo -e "${YELLOW}[!]${NC} $*"; }
 err()   { echo -e "${RED}[x]${NC} $*"; }
 step()  { echo -e "${CYAN}==> $*${NC}"; }
 
+# ---------- Arguments ----------
+SERVER_NAME=""
+IS_PRIMARY=false
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --server-name) SERVER_NAME="$2"; shift 2 ;;
+    --primary) IS_PRIMARY=true; shift ;;
+    *) shift ;;
+  esac
+done
+
 # ──────────────────────────────────────────────
 step "Checking dependencies"
 # ──────────────────────────────────────────────
@@ -45,6 +57,36 @@ step "Installing npm dependencies"
 
 cd "$SCRIPT_DIR"
 npm install --production
+
+# ---------- Server Identity ----------
+
+if [ -z "$SERVER_NAME" ]; then
+  read -p "Enter a name for this server (e.g., desktop, laptop): " SERVER_NAME
+  SERVER_NAME="${SERVER_NAME:-default}"
+fi
+
+mkdir -p "$SCRIPT_DIR/data"
+cat > "$SCRIPT_DIR/data/identity.json" << IDEOF
+{
+  "name": "$SERVER_NAME"
+}
+IDEOF
+echo "Server identity set to: $SERVER_NAME"
+
+if [ "$IS_PRIMARY" = true ] && [ ! -f "$SCRIPT_DIR/data/servers.json" ]; then
+  cat > "$SCRIPT_DIR/data/servers.json" << SEOF
+{
+  "servers": [
+    {
+      "name": "$SERVER_NAME",
+      "tunnel": "",
+      "local": []
+    }
+  ]
+}
+SEOF
+  echo "Initialized servers.json with self as primary."
+fi
 
 # ──────────────────────────────────────────────
 step "Setting up tmux-kitty-shell wrapper"
@@ -195,6 +237,16 @@ info "Service + watcher enabled (will start on boot)"
 if command -v loginctl >/dev/null; then
   loginctl enable-linger "$(whoami)" 2>/dev/null || true
   info "Linger enabled — service will start at boot, even before login"
+fi
+
+# ---------- Git Pre-Commit Hook (auto version bump) ----------
+
+HOOK_TARGET="$SCRIPT_DIR/.git/hooks/pre-commit"
+if [ ! -f "$HOOK_TARGET" ]; then
+  ln -sf ../../scripts/bump-version.sh "$HOOK_TARGET"
+  echo "Installed pre-commit hook for auto version bumping."
+else
+  echo "Pre-commit hook already exists, skipping."
 fi
 
 # ──────────────────────────────────────────────
