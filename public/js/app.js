@@ -222,22 +222,33 @@ const App = (() => {
     window.addEventListener('popstate', handlePopState);
     document.getElementById('back-btn').addEventListener('click', () => navigate('dashboard'));
 
-    Dashboard.init();
-    ServerManager.init(() => {});
-    // Set primary version for sync (use /api/identity which returns stable pkg version, not build ID)
-    fetch('/api/identity').then(r => r.json()).then(d => {
-      ServerManager.setPrimaryVersion(d.version);
-    }).catch(() => {});
+    // Sync inits (DOM setup only — no network calls)
     TerminalView.init();
     TerminalNotes.initNotesOverlay();
     FileBrowser.init();
     FileEditor.init();
     FileUpload.init();
     SettingsPanel.init();
-    handleRoute();
-    startVersionPolling();
     initConnectivityToasts();
     initContrastToggle();
+
+    // Dashboard init — renders from cache immediately
+    Dashboard.init();
+
+    // Show the correct view immediately
+    handleRoute();
+
+    // Non-blocking network calls in parallel
+    ServerManager.init(() => Dashboard.refresh()).then(() => {
+      // After ServerManager has states, trigger first real refresh
+      Dashboard.refresh();
+    });
+
+    // These fire in parallel, non-blocking
+    fetch('/api/identity').then(r => r.json()).then(d => {
+      ServerManager.setPrimaryVersion(d.version);
+    }).catch(() => {});
+    startVersionPolling();
 
     AppNetwork.startLocalProbing({
       showToast,

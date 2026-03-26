@@ -65,6 +65,8 @@ const Dashboard = (() => {
     DashboardBulkKill.init(deps);
     DashboardInfo.init(deps);
 
+    // Render immediately from cache (if available)
+    renderMultiServer();
     startAutoRefresh();
   }
 

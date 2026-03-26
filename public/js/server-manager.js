@@ -1,6 +1,7 @@
 /**
  * server-manager.js — Multi-server connection manager.
  * Fetches server list, resolves best connection per server, aggregates discovery.
+ * Progressive rendering: HOST renders first, remotes fill in as they resolve.
  */
 
 /* global AppNetwork */
@@ -10,9 +11,15 @@ const ServerManager = (() => {
   let serverStates = {};     // name → { origin, mode, online, version, updating, sessions, unmatchedKitty }
   let primaryVersion = null;
   let onUpdate = null;       // callback when server states change
+  let pollCount = 0;         // tracks poll cycles for periodic re-resolve
+  const RESOLVE_INTERVAL = 5; // re-resolve offline servers every N poll cycles
+  const CACHE_KEY = 'tui_server_states_cache';
+
+  // ---------- Init ----------
 
   async function init(updateCallback) {
     onUpdate = updateCallback;
+    restoreFromCache();
     await loadServers();
   }
 
@@ -29,7 +36,7 @@ const ServerManager = (() => {
     if (!serverStates['HOST']) {
       serverStates['HOST'] = {
         config: { name: 'HOST', url: '' },
-        origin: '',  // empty string = same origin (local fetch)
+        origin: '',
         mode: 'local',
         online: true,
         version: null,
@@ -42,7 +49,7 @@ const ServerManager = (() => {
 
     // Initialize state for each remote server
     for (const s of servers) {
-      if (s.name === 'HOST') continue; // skip if someone named a server HOST
+      if (s.name === 'HOST') continue;
       if (!serverStates[s.name]) {
         serverStates[s.name] = {
           config: s,
@@ -65,12 +72,67 @@ const ServerManager = (() => {
       if (!nameSet.has(name)) delete serverStates[name];
     }
 
-    // Resolve connections for remote servers only (HOST is always local)
-    await resolveAll();
+    // Discover HOST immediately (instant — same origin), render right away
+    await discoverServer(serverStates['HOST']);
+    if (onUpdate) onUpdate();
+
+    // Resolve + discover remotes in background, render progressively
+    resolveAndDiscoverRemotes();
+  }
+
+  async function resolveAndDiscoverRemotes() {
+    const remotes = Object.values(serverStates).filter(s => !s.isHost);
+    await Promise.allSettled(remotes.map(async (state) => {
+      await resolveServer(state);
+      if (state.online) await discoverServer(state);
+      // Render after each remote completes
+      if (onUpdate) onUpdate();
+    }));
+    saveToCache();
+  }
+
+  // ---------- Cache ----------
+
+  function saveToCache() {
+    try {
+      const cache = {};
+      for (const [name, state] of Object.entries(serverStates)) {
+        cache[name] = {
+          sessions: state.sessions,
+          unmatchedKitty: state.unmatchedKitty,
+          mode: state.mode,
+          online: state.online,
+          origin: state.origin,
+          version: state.version,
+          isHost: state.isHost || false,
+        };
+      }
+      localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
+    } catch { /* localStorage full or unavailable */ }
+  }
+
+  function restoreFromCache() {
+    try {
+      const cached = JSON.parse(localStorage.getItem(CACHE_KEY));
+      if (!cached) return;
+      for (const [name, data] of Object.entries(cached)) {
+        serverStates[name] = {
+          config: { name, url: '' },
+          origin: data.origin || '',
+          mode: data.mode,
+          online: data.online,
+          version: data.version,
+          updating: false,
+          sessions: data.sessions || [],
+          unmatchedKitty: data.unmatchedKitty || [],
+          isHost: data.isHost || false,
+        };
+      }
+    } catch { /* bad cache */ }
   }
 
   function isMultiServer() {
-    return true; // always grouped view now
+    return true;
   }
 
   function getServers() {
@@ -110,29 +172,25 @@ const ServerManager = (() => {
     const configUrl = config.url || '';
     if (!configUrl) { state.origin = null; state.mode = null; state.online = false; state.version = null; return; }
 
-    // Normalize the configured URL
     const baseUrl = configUrl.includes('://') ? configUrl : `https://${configUrl}`;
 
-    // First check if the configured URL is reachable
     const identity = await isReachable(baseUrl, 3000);
     if (!identity) {
       state.origin = null; state.mode = null; state.online = false; state.version = null; state.localIPs = [];
       return;
     }
 
-    // Server is reachable — now try to discover local IPs for a faster path
     state.version = identity.version;
     state.online = true;
 
     const networkInfo = await fetchNetworkInfo(baseUrl);
     if (networkInfo && networkInfo.localIPs && networkInfo.httpsPort) {
       state.localIPs = networkInfo.localIPs;
-      // Race local IPs for a faster connection (no 127.0.0.1 — it resolves to the browser's machine, not the remote server)
       const localOrigins = networkInfo.localIPs.map(ip => `https://${ip}:${networkInfo.httpsPort}`);
       try {
         const fastest = await Promise.any(
           localOrigins.map(async (origin) => {
-            const id = await isReachable(origin, 800);
+            const id = await isReachable(origin, 1500);
             if (id) return origin;
             throw new Error('unreachable');
           })
@@ -145,7 +203,6 @@ const ServerManager = (() => {
       state.localIPs = [];
     }
 
-    // Fall back to configured URL
     state.origin = baseUrl;
     state.mode = 'url';
   }
@@ -162,6 +219,7 @@ const ServerManager = (() => {
     await resolveServer(state);
     if (state.online) await discoverServer(state);
     if (onUpdate) onUpdate();
+    saveToCache();
   }
 
   // ---------- Discovery Aggregation ----------
@@ -189,12 +247,23 @@ const ServerManager = (() => {
   }
 
   async function discoverAll() {
+    pollCount++;
+
+    // Every Nth cycle, re-resolve offline servers and re-check connection mode for online ones
+    const shouldReResolve = pollCount % RESOLVE_INTERVAL === 0;
+
+    if (shouldReResolve) {
+      const needsResolve = Object.values(serverStates).filter(s => !s.isHost && (!s.online || s.mode === 'url'));
+      await Promise.allSettled(needsResolve.map(state => resolveServer(state)));
+    }
+
+    // Discover all online servers in parallel
     await Promise.allSettled(
       Object.values(serverStates).map(state => discoverServer(state))
     );
 
-    // Check for version mismatches and trigger updates
     checkVersionSync();
+    saveToCache();
 
     if (onUpdate) onUpdate();
   }
@@ -208,7 +277,7 @@ const ServerManager = (() => {
   function checkVersionSync() {
     if (!primaryVersion) return;
     for (const state of Object.values(serverStates)) {
-      if (state.isHost) continue; // never self-update
+      if (state.isHost) continue;
       if (state.online && state.version && state.version !== primaryVersion && !state.updating) {
         triggerUpdate(state);
       }
@@ -221,7 +290,6 @@ const ServerManager = (() => {
     try {
       const res = await fetch(`${state.origin}/api/update`, { method: 'POST' });
       if (!res.ok) state.updating = false;
-      // Server will restart — it'll come back online with new version on next discovery cycle
     } catch {
       state.updating = false;
     }
@@ -236,7 +304,7 @@ const ServerManager = (() => {
     return `${wsOrigin}/ws/terminal/${encodeURIComponent(sessionName)}`;
   }
 
-  // ---------- API Proxy ----------
+  // ---------- API ----------
 
   function getOrigin(serverName) {
     const state = serverStates[serverName];
