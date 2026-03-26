@@ -20,6 +20,7 @@ const fileRoutes = require('./file-routes');
 
 const PORT = parseInt(process.env.PORT || process.argv[2], 10) || 3000;
 const HTTPS_PORT = parseInt(process.env.HTTPS_PORT, 10) || PORT + 1;
+const BIND = process.env.BIND || null;
 const PKG_VERSION = require('../package.json').version;
 const BUILD_ID = Date.now().toString(36);
 const FULL_VERSION = `${PKG_VERSION.replace(/\.\d+$/, '')}.${BUILD_ID}`;
@@ -29,15 +30,11 @@ const FULL_VERSION = `${PKG_VERSION.replace(/\.\d+$/, '')}.${BUILD_ID}`;
 const app = express();
 app.use(express.json({ limit: '2mb' }));
 
-// CORS
+// Security headers
 app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  if (origin) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  }
-  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  if (req.path.startsWith('/api/')) res.setHeader('Cache-Control', 'no-store');
   next();
 });
 
@@ -80,7 +77,7 @@ try {
     httpsServer = https.createServer({ cert: fs.readFileSync(certPath), key: fs.readFileSync(keyPath) }, app);
   }
 } catch {
-  console.warn('[server] HTTPS certs not found, local fast-path disabled.');
+  console.warn('[server] HTTPS certs not found — HTTPS disabled.');
 }
 
 // ---------- WebSocket ----------
@@ -130,16 +127,16 @@ wss.on('connection', (ws, sessionName) => {
     process.exit(1);
   }
 
-  server.listen(PORT, () => console.log(`TUI Browser listening on http://localhost:${PORT}`));
+  const bindArgs = BIND ? [PORT, BIND] : [PORT];
+  server.listen(...bindArgs, () => {
+    const addr = BIND || '0.0.0.0';
+    console.log(`TUI Browser listening on http://${addr}:${PORT}`);
+  });
   if (httpsServer) {
-    const os = require('os');
-    const ips = [];
-    for (const addrs of Object.values(os.networkInterfaces())) {
-      for (const a of addrs) { if (a.family === 'IPv4' && !a.internal) ips.push(a.address); }
-    }
-    httpsServer.listen(HTTPS_PORT, () => {
-      console.log(`TUI Browser HTTPS on port ${HTTPS_PORT} (local fast-path)`);
-      ips.forEach(ip => console.log(`  https://${ip}:${HTTPS_PORT}`));
+    const httpsBindArgs = BIND ? [HTTPS_PORT, BIND] : [HTTPS_PORT];
+    httpsServer.listen(...httpsBindArgs, () => {
+      const addr = BIND || '0.0.0.0';
+      console.log(`TUI Browser HTTPS on https://${addr}:${HTTPS_PORT}`);
     });
   }
 
