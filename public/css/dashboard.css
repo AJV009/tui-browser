@@ -285,8 +285,8 @@
 .server-group:first-child { padding-top: 0; }
 .server-group.collapsed { padding-top: 6px; }
 .server-group.collapsed:first-child { padding-top: 0; }
-.server-group.collapsed + .server-group,
-.server-group + .server-group.collapsed { border-top: 1px solid var(--border); }
+.server-group.collapsed .server-group-header { margin-bottom: 0; }
+.server-group.collapsed + .server-group { border-top: 1px solid var(--border); }
 .server-group-header {
   display: flex; align-items: center; justify-content: space-between;
   padding: 0 4px; margin-bottom: 10px;
