@@ -153,6 +153,20 @@ TUI Browser requires [Tailscale](https://tailscale.com/) for network access. Tai
 
 **MagicDNS:** Tailscale assigns each machine a hostname like `machine-name.tailnet-name.ts.net`. Use these instead of raw IPs.
 
+**Custom domain (optional):** Point a DNS A record to the Tailscale IP (e.g., `tui.yourdomain.com` → `100.x.x.x`). Set the record to **DNS only** (not proxied) in your DNS provider. The domain resolves globally but only Tailscale devices can connect.
+
+### Additional Machine Setup
+
+After running `./install.sh` on a new machine, a few extra steps may be needed:
+
+**File browser icons:** The 1,480+ vscode-icons SVGs are gitignored and generated locally. If the file browser shows no icons, copy them from a machine that has them:
+```bash
+rsync -a primary-machine:~/project/tui-browser/public/icons/ ~/project/tui-browser/public/icons/
+```
+Or regenerate with `bash scripts/bundle-vscode-icons.sh` (requires npm in PATH).
+
+**Node.js via nvm:** If using nvm instead of Volta or system Node, ensure the systemd unit can find Node. Check that `ExecStart` in `~/.config/systemd/user/tui-browser.service` points to the correct Node binary and `PATH` includes your nvm bin directory.
+
 ## Security
 
 **This tool gives full shell access and filesystem access from a browser.**
