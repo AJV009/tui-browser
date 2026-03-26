@@ -320,6 +320,10 @@ const ServerManager = (() => {
     if (!primaryVersion) return;
     for (const state of Object.values(serverStates)) {
       if (state.isHost) continue;
+      // Clear updating flag if version now matches
+      if (state.updating && state.version === primaryVersion) {
+        state.updating = false;
+      }
       if (state.online && state.version && state.version !== primaryVersion && !state.updating) {
         triggerUpdate(state);
       }
