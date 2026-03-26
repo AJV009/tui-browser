@@ -183,6 +183,7 @@ function setup(app, { discovery, sessions, kittyDiscovery, state, aiTitles, conf
 
   // ---------- Shortcuts / Titles / Rename / Lock ----------
 
+  const dataDir = path.join(__dirname, '..', 'data');
   const shortcutsPath = path.join(dataDir, 'shortcuts.json');
   const shortcutsSamplePath = path.join(dataDir, 'shortcuts.sample.json');
   if (!fs.existsSync(shortcutsPath) && fs.existsSync(shortcutsSamplePath)) {
@@ -257,7 +258,6 @@ function setup(app, { discovery, sessions, kittyDiscovery, state, aiTitles, conf
 
   // ---------- Notes & Input History ----------
 
-  const dataDir = path.join(__dirname, '..', 'data');
   const notesPath = path.join(dataDir, 'notes.json');
   const historyPath = path.join(dataDir, 'input-history.json');
 
