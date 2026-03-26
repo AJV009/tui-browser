@@ -54,6 +54,14 @@ const TerminalControls = (() => {
       aiTitleBtn.classList.remove('loading');
     });
 
+    // Files button in terminal pill controls
+    const termFilesBtn = document.getElementById('terminal-files-btn');
+    if (termFilesBtn) {
+      termFilesBtn.addEventListener('click', () => {
+        const serverOrigin = App.getCurrentServer() ? ServerManager.getOrigin(App.getCurrentServer()) : '';
+        FileBrowser.open(null, serverOrigin || '');
+      });
+    }
 
     // Editable session name
     const nameLabel = document.getElementById('terminal-session-name');
