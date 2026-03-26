@@ -53,7 +53,7 @@ const Dashboard = (() => {
       if (!card) return;
       const session = card.dataset.session;
       const now = Date.now();
-      if (session === lastTapSession && now - lastTap < 400) { connectTo(session); lastTap = 0; lastTapSession = null; }
+      if (session === lastTapSession && now - lastTap < 400) { connectTo(session, card.dataset.server); lastTap = 0; lastTapSession = null; }
       else { lastTap = now; lastTapSession = session; }
     });
 
@@ -117,7 +117,7 @@ const Dashboard = (() => {
       expiryHtml = `<div class="session-expiry">Exp: ${dd}-${mm}-${yy},${hh}:${mi}</div>`;
     }
 
-    return `<div class="session-card${hasKitty ? ' kitty-card' : ''}${isSel ? ' session-selected' : ''}${isLocked ? ' session-locked' : ''}" data-session="${esc(s.name)}">
+    return `<div class="session-card${hasKitty ? ' kitty-card' : ''}${isSel ? ' session-selected' : ''}${isLocked ? ' session-locked' : ''}" data-session="${esc(s.name)}"${s._server ? ` data-server="${esc(s._server)}"` : ''}>
         <div class="select-circle${isSel ? ' selected' : ''}" data-action="toggle-select" data-session="${esc(s.name)}"></div>
         <div class="lock-toggle${isLocked ? ' locked' : ''}" data-action="toggle-lock" data-session="${esc(s.name)}" title="${isLocked ? 'Unlock' : 'Lock'}">${isLocked ? ICON.lock : ICON.unlock}</div>
         <div class="session-card-header"><span class="session-name">${esc(label)}</span><span class="session-status">${hasKitty ? '<span class="source-badge kitty-badge">Kitty</span>' : ''}<span class="status-dot ${statusClass}"></span>${statusLabel}</span></div>
