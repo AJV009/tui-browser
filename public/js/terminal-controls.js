@@ -34,7 +34,9 @@ const TerminalControls = (() => {
       const confirmed = await App.showModal(`Kill session "${name}"? This will terminate all processes in it.`, 'Kill');
       if (!confirmed) return;
       try {
-        await fetch(`/api/sessions/${encodeURIComponent(name)}`, { method: 'DELETE' });
+        const serverName = App.getCurrentServer();
+        const origin = serverName ? ServerManager.getOrigin(serverName) : '';
+        await fetch(`${origin}/api/sessions/${encodeURIComponent(name)}`, { method: 'DELETE' });
         App.navigate('dashboard');
       } catch { /* handled by disconnect */ }
     });
@@ -47,7 +49,9 @@ const TerminalControls = (() => {
       if (!session || aiTitleBtn.classList.contains('loading')) return;
       aiTitleBtn.classList.add('loading');
       try {
-        const res = await fetch(`/api/sessions/${encodeURIComponent(session)}/generate-title`, { method: 'POST' });
+        const serverName = App.getCurrentServer();
+        const origin = serverName ? ServerManager.getOrigin(serverName) : '';
+        const res = await fetch(`${origin}/api/sessions/${encodeURIComponent(session)}/generate-title`, { method: 'POST' });
         const data = await res.json();
         if (data.title) document.getElementById('terminal-session-name').textContent = data.title;
       } catch { /* ignore */ }
@@ -82,7 +86,9 @@ const TerminalControls = (() => {
       const newName = nameInput.value.trim();
       if (!newName || newName === nameLabel.textContent) return;
       try {
-        const res = await fetch(`/api/sessions/${encodeURIComponent(_getSession())}/rename`, {
+        const sn = App.getCurrentServer();
+        const o = sn ? ServerManager.getOrigin(sn) : '';
+        const res = await fetch(`${o}/api/sessions/${encodeURIComponent(_getSession())}/rename`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ newName }),
