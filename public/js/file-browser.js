@@ -98,8 +98,7 @@ const FileBrowser = (() => {
 
   async function getDefaultPath() {
     if (_originView === 'terminal') {
-      const hash = window.location.hash;
-      const sessionName = hash.split('/').slice(1).join('/');
+      const sessionName = App.getCurrentSession();
       if (sessionName) {
         try {
           const res = await fetch(`${_serverOrigin}/api/files/cwd?session=${encodeURIComponent(sessionName)}`);
