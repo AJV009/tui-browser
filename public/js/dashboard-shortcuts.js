@@ -93,13 +93,11 @@ const DashboardShortcuts = (() => {
 
     for (const server of serverNames) {
       const shortcuts = allShortcuts[server] || [];
-      if (serverNames.length > 1) {
-        html += `<div class="shortcut-group-header">${esc(server)}</div>`;
-      }
+      html += `<div class="shortcut-group-header">${esc(server)}</div>`;
       html += shortcuts.map((s, i) => `
       <div class="shortcut-item" data-shortcut-idx="${i}" data-server="${esc(server)}">
         <div class="shortcut-item-row">
-          <span class="shortcut-label">${esc(s.label)}${serverNames.length > 1 ? `<span class="shortcut-server-tag">${esc(server)}</span>` : ''}</span>
+          <span class="shortcut-label">${esc(s.label)}<span class="shortcut-server-tag">${esc(server)}</span></span>
           <button class="shortcut-edit-btn" data-shortcut-idx="${i}" data-server="${esc(server)}" title="Edit shortcut">
             <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M11.013 1.427a1.75 1.75 0 012.474 0l1.086 1.086a1.75 1.75 0 010 2.474l-8.61 8.61c-.21.21-.47.364-.756.445l-3.251.93a.75.75 0 01-.927-.928l.929-3.25a1.75 1.75 0 01.445-.758l8.61-8.61zm1.414 1.06a.25.25 0 00-.354 0L3.463 11.1a.25.25 0 00-.064.108l-.563 1.97 1.971-.564a.25.25 0 00.108-.064l8.61-8.61a.25.25 0 000-.353L12.427 2.488z"/></svg>
           </button>
@@ -122,9 +120,7 @@ const DashboardShortcuts = (() => {
   function showCustomCommandPopup() {
     const { overlay, msg, confirmBtn, cancelBtn } = App.getModalElements();
     const servers = getServerNames();
-    const serverPicker = servers.length > 1
-      ? `<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">${servers.map((s, i) => `<button class="custom-server-pick${i === 0 ? ' active' : ''}" data-server="${_deps.esc(s)}" style="padding:4px 10px;border-radius:4px;border:1px solid var(--border);background:${i === 0 ? 'var(--accent-dim)' : 'transparent'};color:${i === 0 ? 'var(--accent)' : 'var(--text-dim)'};font-family:var(--mono);font-size:11px;cursor:pointer;text-transform:uppercase;letter-spacing:0.5px">${_deps.esc(s)}</button>`).join('')}</div>`
-      : '';
+    const serverPicker = `<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">${servers.map((s, i) => `<button class="custom-server-pick${i === 0 ? ' active' : ''}" data-server="${_deps.esc(s)}" style="padding:4px 10px;border-radius:4px;border:1px solid var(--border);background:${i === 0 ? 'var(--accent-dim)' : 'transparent'};color:${i === 0 ? 'var(--accent)' : 'var(--text-dim)'};font-family:var(--mono);font-size:11px;cursor:pointer;text-transform:uppercase;letter-spacing:0.5px">${_deps.esc(s)}</button>`).join('')}</div>`;
 
     msg.innerHTML = `
       <div style="margin-bottom:12px;font-family:var(--mono);font-size:13px;font-weight:600;color:var(--accent)">Custom Command</div>
@@ -188,7 +184,7 @@ const DashboardShortcuts = (() => {
     const { overlay, msg, confirmBtn, cancelBtn } = App.getModalElements();
 
     msg.innerHTML = `
-      <div style="margin-bottom:12px;font-family:var(--mono);font-size:13px;font-weight:600;color:var(--accent)">Edit Shortcut${Object.keys(allShortcuts).length > 1 ? ` <span style="color:var(--text-muted);font-size:11px;text-transform:uppercase">${_deps.esc(server)}</span>` : ''}</div>
+      <div style="margin-bottom:12px;font-family:var(--mono);font-size:13px;font-weight:600;color:var(--accent)">Edit Shortcut <span style="color:var(--text-muted);font-size:11px;text-transform:uppercase">${_deps.esc(server)}</span></div>
       <input id="edit-label" type="text" value="${shortcut.label.replace(/"/g, '&quot;')}" placeholder="Title" autocomplete="off" style="width:100%;padding:8px 10px;margin-bottom:8px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--mono);font-size:12px;outline:none;">
       <input id="edit-cmd" type="text" value="${shortcut.command.replace(/"/g, '&quot;')}" placeholder="Command" autocomplete="off" style="width:100%;padding:8px 10px;margin-bottom:12px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--mono);font-size:12px;outline:none;">
       <button id="edit-delete-btn" style="width:100%;padding:8px 10px;background:transparent;border:1px solid var(--danger, #e55);border-radius:6px;color:var(--danger, #e55);font-family:var(--mono);font-size:12px;cursor:pointer;transition:background 0.15s;">Delete shortcut</button>`;
@@ -245,32 +241,19 @@ const DashboardShortcuts = (() => {
     document.getElementById('edit-delete-btn').addEventListener('click', onDelete);
   }
 
+  // Track which server the next session create should target
+  let _targetServer = 'HOST';
+
+  function getTargetServer() { return _targetServer; }
+
   function prefill(shortcut, serverName) {
     const base = shortcut.label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
     const name = base + '-' + Date.now().toString(36).slice(-4);
     document.getElementById('new-session-name').value = name;
     document.getElementById('new-session-cmd').value = shortcut.command;
-
-    // Create session on the target server
-    const states = ServerManager.getServerStates();
-    const state = states[serverName];
-    const origin = (state && !state.isHost) ? state.origin : '';
-
-    fetch(`${origin}/api/sessions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, command: shortcut.command }),
-    }).then(async res => {
-      if (!res.ok) {
-        const err = await res.json();
-        App.showModal(err.error || 'Failed to create session', 'OK');
-      } else {
-        document.getElementById('new-session-name').value = '';
-        document.getElementById('new-session-cmd').value = '';
-        _deps.refresh();
-      }
-    }).catch(err => App.showModal('Failed to create session: ' + err.message, 'OK'));
+    _targetServer = serverName || 'HOST';
+    document.getElementById('new-session-cmd').focus();
   }
 
-  return { init };
+  return { init, getTargetServer };
 })();
