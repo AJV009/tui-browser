@@ -42,6 +42,29 @@ fi
 
 info "node $(node --version), npm $(npm --version), tmux $(tmux -V)"
 
+# Tailscale is required for network security
+if ! command -v tailscale &>/dev/null; then
+  err "Tailscale is required but not installed."
+  echo "  Install: https://tailscale.com/download"
+  echo "  Then run: sudo tailscale up"
+  exit 1
+fi
+
+if ! tailscale status &>/dev/null; then
+  err "Tailscale is installed but not running."
+  echo "  Start it with: sudo tailscale up"
+  exit 1
+fi
+
+TAILSCALE_IP=$(tailscale ip -4 2>/dev/null)
+if [ -z "$TAILSCALE_IP" ]; then
+  err "Could not detect Tailscale IPv4 address."
+  echo "  Make sure Tailscale is connected: tailscale status"
+  exit 1
+fi
+
+info "Tailscale IP: $TAILSCALE_IP"
+
 # Optional
 if command -v kitty >/dev/null; then
   info "kitty found (optional Kitty integration available)"
@@ -79,8 +102,7 @@ if [ "$IS_PRIMARY" = true ] && [ ! -f "$SCRIPT_DIR/data/servers.json" ]; then
   "servers": [
     {
       "name": "$SERVER_NAME",
-      "tunnel": "",
-      "local": []
+      "url": "http://$TAILSCALE_IP:7483"
     }
   ]
 }
@@ -96,21 +118,6 @@ mkdir -p ~/.local/bin
 cp "$SCRIPT_DIR/scripts/tmux-kitty-shell" ~/.local/bin/tmux-kitty-shell
 chmod +x ~/.local/bin/tmux-kitty-shell
 info "Installed ~/.local/bin/tmux-kitty-shell"
-
-# ──────────────────────────────────────────────
-step "Generating HTTPS certificates for local fast-path"
-# ──────────────────────────────────────────────
-
-if [ ! -f "$SCRIPT_DIR/certs/server.crt" ]; then
-  if command -v openssl &>/dev/null; then
-    bash "$SCRIPT_DIR/scripts/generate-certs.sh"
-    info "HTTPS certificates generated (accept cert on phone for fast local access)"
-  else
-    warn "openssl not found — skipping HTTPS cert generation (local fast-path disabled)"
-  fi
-else
-  info "HTTPS certificates already exist, skipping"
-fi
 
 # ──────────────────────────────────────────────
 step "Setting up tmux configuration"
@@ -192,6 +199,7 @@ Environment=HOME=$HOME
 Environment=LANG=en_IN.UTF-8
 Environment=LC_ALL=en_IN.UTF-8
 Environment=PORT=7483
+Environment=BIND=$TAILSCALE_IP
 ExecStart=$NODE_BIN $SCRIPT_DIR/server/index.js
 Restart=on-failure
 RestartSec=3
@@ -261,7 +269,7 @@ sleep 1
 if systemctl --user is-active --quiet tui-browser.service; then
   info "TUI Browser is running!"
   echo ""
-  echo -e "  ${GREEN}http://localhost:7483${NC}"
+  echo -e "  ${GREEN}http://$TAILSCALE_IP:7483${NC}  (Tailscale only)"
   echo ""
 else
   err "Service failed to start. Check logs with:"
