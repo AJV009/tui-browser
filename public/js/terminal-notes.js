@@ -3,7 +3,7 @@
  * Sent: per-session input history. Notes: persistent scratchpad accessible from any terminal.
  */
 
-/* global App */
+/* global App, ServerManager */
 
 const TerminalNotes = (() => {
   let _sessionName = null;
@@ -56,7 +56,9 @@ const TerminalNotes = (() => {
   async function fetchHistory() {
     if (!_sessionName) return;
     try {
-      const res = await fetch(`/api/sessions/${encodeURIComponent(_sessionName)}/input-history`);
+      const sn = App.getCurrentServer();
+      const origin = sn ? ServerManager.getOrigin(sn) : '';
+      const res = await fetch(`${origin}/api/sessions/${encodeURIComponent(_sessionName)}/input-history`);
       if (res.ok) {
         const data = await res.json();
         _history = data.entries || [];
