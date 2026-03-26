@@ -20,7 +20,7 @@
 
 Access and control your terminal sessions from any browser — phone, tablet, or another computer. The browser and host terminal stay perfectly in sync, both viewing and controlling the same tmux session. Unlike SSH tools that spawn isolated shells, this mirrors your actual desktop terminal in real-time.
 
-Built for TUI-heavy workflows (Claude Code, OpenCode, Codex, htop, etc.) where you want to start something on your desktop and check on it from your phone.
+Built for TUI-heavy workflows (Claude Code, OpenCode, Codex, htop, etc.) where you want to start something on your desktop and check on it from your phone. Supports multiple machines from a single dashboard.
 
 <p align="center">
   <img src="public/readme_assets/session_listing.png" alt="Session dashboard" width="720">
@@ -37,12 +37,14 @@ Built for TUI-heavy workflows (Claude Code, OpenCode, Codex, htop, etc.) where y
 - **AI session titles** — uses Claude CLI (haiku) to auto-generate contextual session names from terminal output.
 - **Claude Code detection** — auto-detects Claude Code sessions and shows a Claude icon button when remote-control is active. Click to copy the URL, double-click to open it.
 - **Text input panel** — compose text and send it to the terminal in one shot (like paste), avoids mobile keystroke drops. Pen icon in the quick-keys bar.
-- **File browser** — session-aware file manager accessible from any view. Browse, view, edit, upload, and download files from your phone. Opens to the terminal session's working directory.
+- **File browser** — per-server file manager accessible from each server group and terminal view. Browse, view, edit, upload, and download files. Opens to the terminal session's working directory.
+- **Multi-machine federation** — connect multiple computers to one dashboard. Each machine runs its own tui-browser server; the client connects directly to each. Sessions are grouped by server with collapsible sections.
 - **Mobile-optimized** — quick-keys bar (toggleable on all screen sizes), scroll controls, text selection overlay, keyboard-aware viewport.
 
 ### Dashboard & Session Tools
 
-- **Unified dashboard** — tmux sessions enriched with Kitty metadata (tab title, focus state, viewer count).
+- **Unified dashboard** — tmux sessions grouped by server, enriched with Kitty metadata (tab title, focus state, viewer count). Collapsible server sections with state persisted in browser.
+- **Server settings panel** — add/remove servers via the wrench icon. Enter a URL (tunnel or local IP), sync button auto-discovers LAN IPs for fast-path connections.
 - **Quick Launch** — preset and custom commands saved to `shortcuts.json`, launch sessions in one tap.
 - **Bulk session kill** — select multiple sessions to kill at once, or use filter presets: detached, idle, no running commands, or all.
 - **Session info panel** — live-updating stats: memory, CPU, process tree, uptime, recent terminal output.
@@ -63,7 +65,8 @@ Built for TUI-heavy workflows (Claude Code, OpenCode, Codex, htop, etc.) where y
 
 ### Under the Hood
 
-- **Local network fast-path** — auto-switches between Cloudflare tunnel and direct LAN connection for lowest latency. Green house icon = local, orange globe = tunnel.
+- **Local network fast-path** — auto-discovers LAN IPs from each server and races them against the configured URL. Green house icon = local, orange globe = remote. Works per-server in multi-machine setups.
+- **Auto-update** — remote servers auto-pull from git and restart when the primary server's version bumps. Pre-commit hook auto-bumps patch version on every commit.
 - **Auto-discovery** — PID matching links Kitty windows to their tmux sessions automatically.
 - **60fps TUI rendering** — tmux + xterm.js WebGL handles high-frequency output (Claude Code, Ratatui apps, etc.)
 - **PWA with auto-update** — installable app, polls server version, auto-reloads on code changes.
@@ -89,8 +92,11 @@ Built for TUI-heavy workflows (Claude Code, OpenCode, Codex, htop, etc.) where y
 ## Quick Start
 
 ```bash
-# One-command setup: installs deps, configures tmux, sets up systemd service
-./install.sh
+# Primary machine (serves the dashboard)
+./install.sh --server-name desktop --primary
+
+# Additional machines
+./install.sh --server-name laptop
 ```
 
 The install script handles:
@@ -99,8 +105,10 @@ The install script handles:
 - `~/.tmux.conf` (terminal capabilities, UTF-8, passthrough for TUI apps)
 - systemd user service (auto-start on boot, even before login)
 - systemd file watcher (auto-restart on code changes)
+- Server identity (`data/identity.json`) — names the server for the dashboard
+- Pre-commit hook for auto version bumping
 
-After install, the dashboard is at `http://localhost:7483`.
+After install, the dashboard is at `http://localhost:7483`. Add additional servers via the wrench icon in the dashboard header.
 
 ### Manual Start (without systemd)
 
@@ -271,8 +279,13 @@ systemctl --user stop tui-browser-tunnel
 |--------|----------|-------------|
 | `GET` | `/api/discover` | Unified discovery (tmux sessions + Kitty windows) |
 | `GET` | `/api/version` | Server version + build ID + claude availability |
+| `GET` | `/api/identity` | Server name + package version (for federation) |
 | `GET` | `/api/network` | Local IPs + HTTPS port for LAN fast-path |
 | `GET` | `/api/health` | Server + tmux + Kitty status |
+| `GET` | `/api/servers` | Multi-server configuration list |
+| `PUT` | `/api/servers` | Update server list `{ servers: [{ name, url }] }` |
+| `GET` | `/api/update/status` | Check if self-update is in progress |
+| `POST` | `/api/update` | Trigger git pull + npm install + restart |
 | `GET` | `/api/sessions` | List tmux sessions |
 | `GET` | `/api/sessions/:name` | Session details + preview |
 | `GET` | `/api/sessions/:name/info` | Live session stats (memory, CPU, processes, output) |
@@ -327,13 +340,18 @@ tui-browser/
 │   ├── kitty-discovery.js    # Kitty remote control discovery
 │   ├── claude-detect.js      # Claude Code session + remote-control detection
 │   ├── file-routes.js        # File browser REST API (browse, edit, upload, download)
+│   ├── identity.js           # Server identity (name + version for federation)
+│   ├── servers.js            # Multi-server config CRUD (data/servers.json)
+│   ├── update.js             # Self-update endpoint (git pull + restart)
 │   └── exec-util.js          # Shared subprocess utility
 ├── public/
 │   ├── index.html            # SPA shell
 │   ├── js/
 │   │   ├── app.js            # Hash router, modal, toast, version polling
 │   │   ├── app-network.js    # Local network fast-path detection
-│   │   ├── dashboard.js      # Session cards, rendering, CRUD
+│   │   ├── server-manager.js # Multi-server connection manager + discovery aggregator
+│   │   ├── settings-panel.js # Server settings overlay (add/edit/remove servers)
+│   │   ├── dashboard.js      # Session cards, server groups, rendering, CRUD
 │   │   ├── dashboard-shortcuts.js  # Quick Launch dropdown
 │   │   ├── dashboard-bulk-kill.js  # Selection + bulk kill modal
 │   │   ├── dashboard-info.js       # Session info overlay
@@ -355,6 +373,7 @@ tui-browser/
 │   └── icons/                    # vscode-icons SVGs (1,480 file type icons, gitignored)
 ├── scripts/
 │   ├── tmux-kitty-shell          # Wrapper: launches Kitty windows inside tmux
+│   ├── bump-version.sh           # Pre-commit hook: auto-bump patch version
 │   ├── bundle-codemirror.sh      # One-time CodeMirror 6 build script
 │   └── bundle-vscode-icons.sh    # One-time vscode-icons build script
 ├── install.sh                # One-command setup
@@ -394,22 +413,21 @@ If the [Claude CLI](https://claude.com/claude-code) is installed, sessions can b
 ## How It Works
 
 ```
-Phone/Tablet/Laptop Browser              Host Machine (Kitty + tmux)
-┌──────────────────────────┐            ┌────────────────────────────────────┐
-│  Dashboard               │            │  Node.js Server (port 7483)       │
-│  ┌─────────────────────┐ │   HTTPS    │  ├── REST API (session CRUD)      │
-│  │ Unified session     │ │◄══════════►│  ├── WebSocket (terminal I/O)     │
-│  │ cards with Kitty    │ │  Cloudflare│  ├── tmux discovery               │
-│  │ badges              │ │   Tunnel   │  ├── Kitty discovery + PID match  │
-│  └─────────────────────┘ │            │  └── session-manager (node-pty)   │
-│  Terminal View           │            │       └── tmux attach             │
-│  ┌─────────────────────┐ │            └────────────────────────────────────┘
-│  │ xterm.js (WebGL)    │ │                       │
-│  │ Full bidirectional  │ │                       ▼
-│  │ terminal I/O        │ │            ┌────────────────────┐
-│  └─────────────────────┘ │            │ tmux session       │
-└──────────────────────────┘            │ (shared by Kitty   │
-                                        │  + browser)        │
+Phone/Tablet/Laptop Browser              Machine A (primary)          Machine B (remote)
+┌──────────────────────────┐            ┌──────────────────────┐    ┌──────────────────────┐
+│  Dashboard               │            │  Node.js Server      │    │  Node.js Server      │
+│  ┌─ HOST ──────────────┐ │   HTTPS    │  ├── REST API        │    │  ├── REST API        │
+│  │ Sessions from A     │ │◄══════════►│  ├── WebSocket       │    │  ├── WebSocket       │
+│  └─────────────────────┘ │  tunnel /  │  ├── tmux discovery  │    │  ├── tmux discovery  │
+│  ┌─ LAPTOP ────────────┐ │   LAN      │  ├── serves frontend │    │  ├── /api/identity   │
+│  │ Sessions from B     │ │◄══════╦═══►│  ├── /api/servers    │    │  └── /api/update     │
+│  └─────────────────────┘ │       ║    │  └── session-manager │    └──────────────────────┘
+│  Terminal View           │       ║    └──────────────────────┘               │
+│  ┌─────────────────────┐ │       ║               │                          ▼
+│  │ xterm.js — direct   │ │       ╚══════════════════════════►    ┌────────────────────┐
+│  │ WebSocket to B      │ │                       ▼               │ tmux sessions      │
+│  └─────────────────────┘ │            ┌────────────────────┐    └────────────────────┘
+└──────────────────────────┘            │ tmux sessions      │
                                         └────────────────────┘
 ```
 
@@ -419,6 +437,17 @@ Phone/Tablet/Laptop Browser              Host Machine (Kitty + tmux)
 4. **Both viewers** (Kitty + browser) see identical output — tmux handles multi-client sync natively
 5. **Creating a session** from the browser also opens a Kitty window on the host
 6. **Killing a session** from the browser closes the Kitty window automatically
+
+### Multi-Machine Federation
+
+Each machine runs its own independent tui-browser server. The primary server hosts the frontend SPA. The client (browser) connects directly to each server — no proxy or relay.
+
+- **HOST** group always shows the primary server's sessions
+- Additional servers are added via the settings panel (wrench icon)
+- The client fetches `/api/network` from each server to auto-discover LAN IPs
+- It races LAN IPs against the configured URL for the fastest connection per server
+- Terminal WebSocket connects directly to the session's origin server
+- Version sync: when the primary's `package.json` version bumps, remote servers auto-pull and restart
 
 ---
 
