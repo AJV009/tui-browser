@@ -1,9 +1,8 @@
 /**
  * app.js — SPA router, modal, toast, version polling.
- * Network probing is in app-network.js (AppNetwork).
  */
 
-/* global Dashboard, TerminalView, AppNetwork, FileBrowser, FileEditor, FileUpload, ServerManager, SettingsPanel */
+/* global Dashboard, TerminalView, FileBrowser, FileEditor, FileUpload, ServerManager, SettingsPanel */
 
 const App = (() => {
   let currentView = 'dashboard';
@@ -251,24 +250,17 @@ const App = (() => {
     }).catch(() => {});
     startVersionPolling();
 
-    AppNetwork.startLocalProbing({
-      showToast,
-      get currentSession() { return currentSession; },
-      get currentView() { return currentView; },
-    });
   }
 
   return {
     init, navigate, showModal, showToast, getModalElements,
     pushOverlay, popOverlay,
     getWsUrl: (sessionName, serverName) => {
-      if (serverName) return ServerManager.getWsUrl(serverName, sessionName);
-      return AppNetwork.getWsUrl(sessionName);
+      return ServerManager.getWsUrl(serverName || 'HOST', sessionName);
     },
-    onNetworkChange: () => AppNetwork.onNetworkChange(),
+    onNetworkChange: () => ServerManager.onNetworkChange(),
     getCurrentSession: () => currentSession,
     getCurrentServer: () => currentServer,
-    getLocalOrigin: () => AppNetwork.getLocalOrigin(),
   };
 })();
 
