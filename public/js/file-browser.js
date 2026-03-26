@@ -248,7 +248,7 @@ const FileBrowser = (() => {
         if (type === 'directory') {
           navigateTo(fullPath);
         } else {
-          if (typeof FileEditor !== 'undefined') FileEditor.open(fullPath);
+          if (typeof FileEditor !== 'undefined') FileEditor.open(fullPath, _serverOrigin);
         }
       } else {
         // First click — wait to see if it's a double

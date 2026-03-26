@@ -8,6 +8,7 @@
 
 const FileEditor = (() => {
   let _filePath = '';
+  let _serverOrigin = '';
   let _originalContent = '';
   let _editorView = null;
   let _editableCompartment = null;
@@ -31,8 +32,9 @@ const FileEditor = (() => {
     $downloadBtn.addEventListener('click', () => FileBrowser.downloadFile(_filePath));
   }
 
-  async function open(filePath) {
+  async function open(filePath, serverOrigin) {
     _filePath = filePath;
+    _serverOrigin = serverOrigin || '';
     _isEditing = false;
     const name = filePath.split('/').pop();
     $filename.textContent = name;
@@ -42,7 +44,7 @@ const FileEditor = (() => {
     $overlay.querySelector('.fe-topbar').classList.remove('fe-editing');
 
     try {
-      const res = await fetch('/api/files/read', {
+      const res = await fetch(`${_serverOrigin}/api/files/read`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ path: filePath }),
@@ -126,7 +128,7 @@ const FileEditor = (() => {
     if (!_editorView) return;
     const content = _editorView.state.doc.toString();
     try {
-      const res = await fetch('/api/files/write', {
+      const res = await fetch(`${_serverOrigin}/api/files/write`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ path: _filePath, content }),
