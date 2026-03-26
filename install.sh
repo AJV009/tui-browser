@@ -211,6 +211,7 @@ Description=Watch TUI Browser source files for changes
 PathModified=$SCRIPT_DIR/server
 PathModified=$SCRIPT_DIR/public/js
 PathModified=$SCRIPT_DIR/public/css
+PathModified=$SCRIPT_DIR/public/index.html
 
 [Install]
 WantedBy=default.target
