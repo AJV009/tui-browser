@@ -20,7 +20,7 @@ const fileRoutes = require('./file-routes');
 
 const PORT = parseInt(process.env.PORT || process.argv[2], 10) || 3000;
 const HTTPS_PORT = parseInt(process.env.HTTPS_PORT, 10) || PORT + 1;
-const BIND = process.env.BIND || null;
+const BIND = (process.env.BIND || '').trim() || null;
 const PKG_VERSION = require('../package.json').version;
 const BUILD_ID = Date.now().toString(36);
 const FULL_VERSION = `${PKG_VERSION.replace(/\.\d+$/, '')}.${BUILD_ID}`;
