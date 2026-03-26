@@ -4,7 +4,6 @@
 
 const path = require('path');
 const fs = require('fs');
-const os = require('os');
 const { exec: run } = require('./exec-util');
 const identity = require('./identity');
 
@@ -12,16 +11,6 @@ function apiHandler(fn) {
   return async (req, res) => {
     try { await fn(req, res); } catch (err) { res.status(500).json({ error: err.message }); }
   };
-}
-
-function getLocalIPs() {
-  const ips = [];
-  for (const addrs of Object.values(os.networkInterfaces())) {
-    for (const a of addrs) {
-      if (a.family === 'IPv4' && !a.internal) ips.push(a.address);
-    }
-  }
-  return ips;
 }
 
 function setup(app, { discovery, sessions, kittyDiscovery, state, aiTitles, config }) {
@@ -36,10 +25,6 @@ function setup(app, { discovery, sessions, kittyDiscovery, state, aiTitles, conf
 
   app.get('/api/identity', (_req, res) => {
     res.json(identity.getIdentity());
-  });
-
-  app.get('/api/network', (_req, res) => {
-    res.json({ localIPs: getLocalIPs(), httpsPort: config.HTTPS_PORT, httpPort: config.PORT });
   });
 
   app.get('/api/health', async (_req, res) => {
