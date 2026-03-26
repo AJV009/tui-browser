@@ -84,49 +84,60 @@ const ServerManager = (() => {
     } catch { return null; }
   }
 
+  async function fetchNetworkInfo(origin, timeoutMs = 3000) {
+    try {
+      const controller = new AbortController();
+      const t = setTimeout(() => controller.abort(), timeoutMs);
+      const r = await fetch(`${origin}/api/network`, { signal: controller.signal });
+      clearTimeout(t);
+      if (!r.ok) return null;
+      return await r.json();
+    } catch { return null; }
+  }
+
   async function resolveServer(state) {
     const config = state.config;
+    const configUrl = config.url || '';
+    if (!configUrl) { state.origin = null; state.mode = null; state.online = false; state.version = null; return; }
 
-    // Race local IPs
-    const localOrigins = (config.local || []).map(addr => {
-      if (addr.includes('://')) return addr;
-      return `https://${addr}`;
-    });
+    // Normalize the configured URL
+    const baseUrl = configUrl.includes('://') ? configUrl : `https://${configUrl}`;
 
-    if (localOrigins.length > 0) {
+    // First check if the configured URL is reachable
+    const identity = await isReachable(baseUrl, 3000);
+    if (!identity) {
+      state.origin = null; state.mode = null; state.online = false; state.version = null; state.localIPs = [];
+      return;
+    }
+
+    // Server is reachable — now try to discover local IPs for a faster path
+    state.version = identity.version;
+    state.online = true;
+
+    const networkInfo = await fetchNetworkInfo(baseUrl);
+    if (networkInfo && networkInfo.localIPs && networkInfo.httpsPort) {
+      state.localIPs = networkInfo.localIPs;
+      // Race local IPs for a faster connection
+      const localOrigins = ['127.0.0.1', ...networkInfo.localIPs].map(ip => `https://${ip}:${networkInfo.httpsPort}`);
       try {
-        const result = await Promise.any(
+        const fastest = await Promise.any(
           localOrigins.map(async (origin) => {
-            const identity = await isReachable(origin);
-            if (identity) return { origin, identity };
+            const id = await isReachable(origin, 800);
+            if (id) return origin;
             throw new Error('unreachable');
           })
         );
-        state.origin = result.origin;
+        state.origin = fastest;
         state.mode = 'local';
-        state.online = true;
-        state.version = result.identity.version;
         return;
-      } catch { /* none reachable */ }
+      } catch { /* no local path available */ }
+    } else {
+      state.localIPs = [];
     }
 
-    // Try tunnel
-    if (config.tunnel) {
-      const identity = await isReachable(config.tunnel, 3000);
-      if (identity) {
-        state.origin = config.tunnel;
-        state.mode = 'tunnel';
-        state.online = true;
-        state.version = identity.version;
-        return;
-      }
-    }
-
-    // Offline
-    state.origin = null;
-    state.mode = null;
-    state.online = false;
-    state.version = null;
+    // Fall back to configured URL
+    state.origin = baseUrl;
+    state.mode = 'url';
   }
 
   async function resolveAll() {
@@ -221,6 +232,13 @@ const ServerManager = (() => {
     return state ? state.origin : null;
   }
 
+  async function fetchLocalIPs(url) {
+    const baseUrl = url.includes('://') ? url : `https://${url}`;
+    const info = await fetchNetworkInfo(baseUrl, 5000);
+    if (info && info.localIPs) return { ips: info.localIPs, httpsPort: info.httpsPort };
+    return null;
+  }
+
   return {
     init,
     loadServers,
@@ -233,5 +251,6 @@ const ServerManager = (() => {
     setPrimaryVersion,
     getWsUrl,
     getOrigin,
+    fetchLocalIPs,
   };
 })();

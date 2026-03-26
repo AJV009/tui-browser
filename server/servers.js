@@ -32,7 +32,7 @@ function setupRoutes(app) {
     for (const s of servers) {
       if (!s.name || typeof s.name !== 'string') return res.status(400).json({ error: 'each server needs a name' });
     }
-    const data = { servers: servers.map(s => ({ name: s.name, tunnel: s.tunnel || '', local: Array.isArray(s.local) ? s.local : [] })) };
+    const data = { servers: servers.map(s => ({ name: s.name, url: s.url || '' })) };
     writeServers(data);
     res.json(data);
   });
