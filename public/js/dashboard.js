@@ -291,5 +291,5 @@ const Dashboard = (() => {
     try { const res = await fetch(`/api/sessions/${encodeURIComponent(name)}/lock`, { method: 'POST' }); if (res.ok) await refresh(); } catch {}
   }
 
-  return { init, refresh };
+  return { init, refresh, renderMultiServer };
 })();

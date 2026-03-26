@@ -239,7 +239,8 @@ const App = (() => {
     handleRoute();
 
     // Non-blocking network calls in parallel
-    ServerManager.init(() => Dashboard.refresh()).then(() => {
+    // onUpdate callback just re-renders — does NOT trigger another discovery cycle
+    ServerManager.init(() => Dashboard.renderMultiServer()).then(() => {
       // After ServerManager has states, trigger first real refresh
       Dashboard.refresh();
     });
