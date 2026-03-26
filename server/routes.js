@@ -6,6 +6,7 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const { exec: run } = require('./exec-util');
+const identity = require('./identity');
 
 function apiHandler(fn) {
   return async (req, res) => {
@@ -31,6 +32,10 @@ function setup(app, { discovery, sessions, kittyDiscovery, state, aiTitles, conf
 
   app.get('/api/version', (_req, res) => {
     res.json({ version: config.FULL_VERSION, startedAt: parseInt(config.BUILD_ID, 36), claudeAvailable: aiTitles.claudeAvailable });
+  });
+
+  app.get('/api/identity', (_req, res) => {
+    res.json(identity.getIdentity());
   });
 
   app.get('/api/network', (_req, res) => {
