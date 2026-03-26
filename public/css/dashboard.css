@@ -327,6 +327,9 @@
   transition: color 0.15s;
 }
 .server-reconnect-btn:hover { color: var(--accent); }
+.server-reconnect-btn.syncing { pointer-events: none; }
+.server-reconnect-btn.syncing svg { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 .server-group-right { display: flex; align-items: center; gap: 8px; }
 
 /* ========== Settings Panel ========== */

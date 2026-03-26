@@ -37,7 +37,7 @@ const ServerManager = (() => {
       serverStates['HOST'] = {
         config: { name: 'HOST', url: '' },
         origin: '',
-        mode: 'local',
+        mode: getHostMode(),
         online: true,
         version: null,
         updating: false,
@@ -45,6 +45,8 @@ const ServerManager = (() => {
         unmatchedKitty: [],
         isHost: true,
       };
+    } else {
+      serverStates['HOST'].mode = getHostMode();
     }
 
     // Initialize state for each remote server
@@ -143,6 +145,38 @@ const ServerManager = (() => {
     return serverStates;
   }
 
+  // ---------- HOST Mode ----------
+
+  function getHostMode() {
+    // HOST mode reflects how the page was loaded
+    // If AppNetwork has a local origin, we're on LAN. Otherwise tunnel/url.
+    if (typeof AppNetwork !== 'undefined' && AppNetwork.getLocalOrigin()) return 'local';
+    // Check if page was loaded from localhost or a local IP
+    const host = window.location.hostname;
+    if (host === 'localhost' || host === '127.0.0.1' || /^192\.168\.|^10\.|^172\.(1[6-9]|2\d|3[01])\./.test(host)) return 'local';
+    return 'url';
+  }
+
+  function updateHostMode() {
+    const hostState = serverStates['HOST'];
+    if (hostState) hostState.mode = getHostMode();
+  }
+
+  // Called when the network changes (WiFi ↔ mobile)
+  async function onNetworkChange() {
+    updateHostMode();
+    // Re-resolve all remote servers immediately
+    await Promise.allSettled(
+      Object.values(serverStates).filter(s => !s.isHost).map(state => resolveServer(state))
+    );
+    // Re-discover all
+    await Promise.allSettled(
+      Object.values(serverStates).map(state => discoverServer(state))
+    );
+    saveToCache();
+    if (onUpdate) onUpdate();
+  }
+
   // ---------- Connection Resolution ----------
 
   async function isReachable(origin, timeoutMs = 1500) {
@@ -216,8 +250,15 @@ const ServerManager = (() => {
   async function reconnectServer(name) {
     const state = serverStates[name];
     if (!state) return;
-    await resolveServer(state);
-    if (state.online) await discoverServer(state);
+    if (state.isHost) {
+      // HOST: don't resolve (no url), just re-discover
+      state.online = true;
+      state.mode = getHostMode();
+      await discoverServer(state);
+    } else {
+      await resolveServer(state);
+      if (state.online) await discoverServer(state);
+    }
     if (onUpdate) onUpdate();
     saveToCache();
   }
@@ -248,6 +289,7 @@ const ServerManager = (() => {
 
   async function discoverAll() {
     pollCount++;
+    updateHostMode();
 
     // Every Nth cycle, re-resolve offline servers and re-check connection mode for online ones
     const shouldReResolve = pollCount % RESOLVE_INTERVAL === 0;
@@ -331,5 +373,6 @@ const ServerManager = (() => {
     getWsUrl,
     getOrigin,
     fetchLocalIPs,
+    onNetworkChange,
   };
 })();

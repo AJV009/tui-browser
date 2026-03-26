@@ -41,7 +41,7 @@ const Dashboard = (() => {
       else if (action === 'kill') kill(btn.dataset.session, btn.dataset.server);
       else if (action === 'toggle-select') DashboardBulkKill.toggleSelect(btn.dataset.session);
       else if (action === 'toggle-lock') toggleLock(btn.dataset.session);
-      else if (action === 'reconnect-server') ServerManager.reconnectServer(btn.dataset.server);
+      else if (action === 'reconnect-server') { btn.classList.add('syncing'); ServerManager.reconnectServer(btn.dataset.server); }
       else if (action === 'server-files') { e.stopPropagation(); FileBrowser.open(null, ServerManager.getOrigin(btn.dataset.server)); }
       else if (action === 'toggle-collapse') { const n = btn.dataset.server; setCollapsed(n, !getCollapsed()[n]); renderMultiServer(); }
     });

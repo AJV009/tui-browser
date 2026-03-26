@@ -104,6 +104,10 @@ const AppNetwork = (() => {
   function onNetworkChange() {
     networkInfo = null;
     probeLocalIPs();
+    // Also trigger ServerManager to re-resolve all servers
+    if (typeof ServerManager !== 'undefined' && ServerManager.onNetworkChange) {
+      ServerManager.onNetworkChange();
+    }
   }
 
   function updateConnectionMode(mode) {
