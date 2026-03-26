@@ -268,6 +268,46 @@
 
 .kitty-icon { background: var(--kitty-dim); color: var(--kitty); }
 
+/* ========== Server Groups ========== */
+.server-group { grid-column: 1 / -1; margin-top: 16px; }
+.server-group:first-child { margin-top: 0; }
+.server-group-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 4px; margin-bottom: 10px;
+}
+.server-group-header-left { display: flex; align-items: center; gap: 8px; }
+.server-group-name {
+  font-family: var(--mono); font-size: 12px; font-weight: 600;
+  color: var(--accent); text-transform: uppercase; letter-spacing: 1px;
+}
+.server-group-count {
+  font-family: var(--mono); font-size: 11px; color: var(--text-muted);
+}
+.server-group-mode {
+  font-size: 10px; color: var(--text-muted); font-family: var(--mono);
+}
+.server-group-sessions {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 8px;
+}
+
+/* Offline server */
+.server-group.offline .server-group-name { color: var(--text-muted); }
+.server-offline-label {
+  font-family: var(--mono); font-size: 10px; color: var(--danger);
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
+.server-updating-label {
+  font-family: var(--mono); font-size: 10px; color: var(--orange);
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
+.server-reconnect-btn {
+  background: none; border: none; cursor: pointer; color: var(--text-muted);
+  display: inline-flex; align-items: center; padding: 4px; border-radius: 4px;
+  transition: color 0.15s;
+}
+.server-reconnect-btn:hover { color: var(--accent); }
+.server-group-right { display: flex; align-items: center; gap: 8px; }
+
 /* ========== Dashboard Responsive ========== */
 @media (max-width: 768px) {
   #session-list { grid-template-columns: 1fr; }

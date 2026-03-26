@@ -3,7 +3,7 @@
  * Sub-modules: dashboard-shortcuts.js, dashboard-bulk-kill.js, dashboard-info.js
  */
 
-/* global App, DashboardShortcuts, DashboardBulkKill, DashboardInfo */
+/* global App, DashboardShortcuts, DashboardBulkKill, DashboardInfo, ServerManager, FileBrowser */
 
 const Dashboard = (() => {
   let refreshInterval = null;
@@ -35,12 +35,13 @@ const Dashboard = (() => {
       const btn = e.target.closest('[data-action]');
       if (!btn) return;
       const action = btn.dataset.action;
-      if (action === 'connect') connectTo(btn.dataset.session);
+      if (action === 'connect') connectTo(btn.dataset.session, btn.dataset.server);
       else if (action === 'open-terminal') openOnPC(btn.dataset.session, btn);
       else if (action === 'info') DashboardInfo.open(btn.dataset.session);
-      else if (action === 'kill') kill(btn.dataset.session);
+      else if (action === 'kill') kill(btn.dataset.session, btn.dataset.server);
       else if (action === 'toggle-select') DashboardBulkKill.toggleSelect(btn.dataset.session);
       else if (action === 'toggle-lock') toggleLock(btn.dataset.session);
+      else if (action === 'reconnect-server') ServerManager.reconnectServer(btn.dataset.server);
     });
 
     let lastTap = 0, lastTapSession = null;
@@ -75,17 +76,22 @@ const Dashboard = (() => {
   // ---------- Data ----------
 
   async function refresh() {
-    try {
-      const res = await fetch('/api/discover');
-      if (!res.ok) throw new Error(res.statusText);
-      const data = await res.json();
-      lastSessions = data.sessions || [];
-      lastUnmatchedKitty = data.unmatchedKitty || [];
-      try { localStorage.setItem('tui_sessions_cache', JSON.stringify({ sessions: lastSessions, unmatchedKitty: lastUnmatchedKitty })); } catch {}
-      render(lastSessions, lastUnmatchedKitty);
-      if (!App.getLocalOrigin()) App.onNetworkChange();
-    } catch {
-      if (!lastSessions) renderError('Connecting\u2026');
+    if (ServerManager.isMultiServer()) {
+      await ServerManager.discoverAll();
+      renderMultiServer();
+    } else {
+      try {
+        const res = await fetch('/api/discover');
+        if (!res.ok) throw new Error(res.statusText);
+        const data = await res.json();
+        lastSessions = data.sessions || [];
+        lastUnmatchedKitty = data.unmatchedKitty || [];
+        try { localStorage.setItem('tui_sessions_cache', JSON.stringify({ sessions: lastSessions, unmatchedKitty: lastUnmatchedKitty })); } catch {}
+        render(lastSessions, lastUnmatchedKitty);
+        if (!App.getLocalOrigin()) App.onNetworkChange();
+      } catch {
+        if (!lastSessions) renderError('Connecting\u2026');
+      }
     }
   }
 
@@ -128,7 +134,7 @@ const Dashboard = (() => {
     DashboardBulkKill.updateButton();
   }
 
-  function renderSessionCard(s) {
+  function renderSessionCard(s, multiServer) {
     const pane = s.panes && s.panes[0];
     const cmd = pane ? pane.command : 'unknown';
     const paneTitle = pane && pane.title ? pane.title : '';
@@ -166,10 +172,10 @@ const Dashboard = (() => {
         ${kittyBadge}
         <div class="session-meta"><span>${esc(cmd)}</span><span>${created}</span>${paneTitle ? `<span>${esc(paneTitle)}</span>` : ''}</div>
         <div class="session-actions">
-          <button class="btn btn-primary btn-icon" data-action="connect" data-session="${esc(s.name)}" title="Connect">${ICON.connect}</button>
+          <button class="btn btn-primary btn-icon" data-action="connect" data-session="${esc(s.name)}"${s._server ? ` data-server="${esc(s._server)}"` : ''} title="Connect">${ICON.connect}</button>
           <button class="btn btn-secondary btn-icon" data-action="open-terminal" data-session="${esc(s.name)}" title="Open on PC">${ICON.monitor}</button>
           <button class="btn btn-secondary btn-icon" data-action="info" data-session="${esc(s.name)}" title="Session info">${ICON.info}</button>
-          <button class="btn btn-danger btn-icon${isLocked ? ' btn-locked' : ''}" data-action="kill" data-session="${esc(s.name)}" title="${isLocked ? 'Locked' : 'Kill'}"${isLocked ? ' disabled' : ''}>${ICON.kill}</button>
+          <button class="btn btn-danger btn-icon${isLocked ? ' btn-locked' : ''}" data-action="kill" data-session="${esc(s.name)}"${s._server ? ` data-server="${esc(s._server)}"` : ''} title="${isLocked ? 'Locked' : 'Kill'}"${isLocked ? ' disabled' : ''}>${ICON.kill}</button>
         </div>
         ${expiryHtml}</div>`;
   }
@@ -188,6 +194,79 @@ const Dashboard = (() => {
     if (list.children.length === 0) list.innerHTML = `<div class="empty-state"><h3>Cannot reach server</h3><p>${esc(msg)}</p></div>`;
   }
 
+  const RECONNECT_SVG = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 8a5.5 5.5 0 0 1 9.3-4"/><path d="M13.5 8a5.5 5.5 0 0 1-9.3 4"/><path d="M11.5 1.5v3h3"/><path d="M4.5 14.5v-3h-3"/></svg>';
+
+  function renderMultiServer() {
+    const list = document.getElementById('session-list');
+    const states = ServerManager.getServerStates();
+    const serverNames = Object.keys(states);
+
+    if (serverNames.length === 0) {
+      list.innerHTML = '<div class="empty-state"><h3>No servers configured</h3><p>Add servers in the settings panel.</p></div>';
+      return;
+    }
+
+    let html = '';
+    let totalSessions = 0;
+
+    for (const name of serverNames) {
+      const state = states[name];
+      const isOnline = state.online;
+      const isUpdating = state.updating;
+      const sessions = state.sessions || [];
+      totalSessions += sessions.length;
+
+      html += `<div class="server-group${isOnline ? '' : ' offline'}">`;
+      html += `<div class="server-group-header">`;
+      html += `<div class="server-group-header-left">`;
+      html += `<span class="server-group-name">${esc(name)}</span>`;
+
+      if (isUpdating) {
+        html += `<span class="server-updating-label">updating\u2026</span>`;
+      } else if (isOnline) {
+        html += `<span class="server-group-count">${sessions.length} session${sessions.length !== 1 ? 's' : ''}</span>`;
+      } else {
+        html += `<span class="server-offline-label">offline</span>`;
+      }
+
+      html += `</div>`;
+      html += `<div class="server-group-right">`;
+
+      if (isOnline && state.mode) {
+        html += `<span class="server-group-mode">${state.mode}</span>`;
+      }
+      if (!isOnline) {
+        html += `<button class="server-reconnect-btn" data-action="reconnect-server" data-server="${esc(name)}" title="Reconnect">${RECONNECT_SVG}</button>`;
+      }
+
+      html += `</div></div>`;
+
+      if (isOnline && sessions.length > 0) {
+        const sorted = [...sessions].sort((a, b) => {
+          switch (sortMode) {
+            case 'recent': return b.created - a.created;
+            case 'oldest': return a.created - b.created;
+            case 'active': return (b.lastActivity || 0) - (a.lastActivity || 0);
+            case 'idle': return (a.lastActivity || 0) - (b.lastActivity || 0);
+            default: return 0;
+          }
+        });
+        html += `<div class="server-group-sessions">`;
+        html += sorted.map(s => renderSessionCard(s, true)).join('');
+        html += `</div>`;
+      }
+
+      html += `</div>`;
+    }
+
+    if (totalSessions === 0 && serverNames.every(n => states[n].online)) {
+      html += '<div class="empty-state"><h3>No sessions found</h3><p>Create a new tmux session on any server to get started.</p></div>';
+    }
+
+    list.innerHTML = html;
+    DashboardBulkKill.updateButton();
+  }
+
   // ---------- Session CRUD ----------
 
   async function handleCreate(e) {
@@ -204,7 +283,13 @@ const Dashboard = (() => {
     } catch (err) { await App.showModal('Failed to create session: ' + err.message, 'OK'); }
   }
 
-  function connectTo(sessionName) { App.navigate('terminal', { session: sessionName }); }
+  function connectTo(sessionName, serverName) {
+    if (serverName) {
+      App.navigate('terminal', { session: sessionName, server: serverName });
+    } else {
+      App.navigate('terminal', { session: sessionName });
+    }
+  }
 
   async function openOnPC(sessionName, btn) {
     try {
@@ -214,13 +299,18 @@ const Dashboard = (() => {
     } catch { setTimeout(() => { btn.disabled = false; btn.style.opacity = ''; }, 2000); }
   }
 
-  async function kill(sessionName) {
-    const s = (lastSessions || []).find(x => x.name === sessionName);
+  async function kill(sessionName, serverName) {
+    const sessions = ServerManager.isMultiServer()
+      ? Object.values(ServerManager.getServerStates()).flatMap(s => s.sessions)
+      : (lastSessions || []);
+    const s = sessions.find(x => x.name === sessionName && (!serverName || x._server === serverName));
     if (s && s.locked) return;
-    const confirmed = await App.showModal(`Kill session "${sessionName}"? This will terminate all processes in it.`, 'Kill');
+    const label = serverName ? `${serverName}:${sessionName}` : sessionName;
+    const confirmed = await App.showModal(`Kill session "${label}"? This will terminate all processes in it.`, 'Kill');
     if (!confirmed) return;
     try {
-      await fetch(`/api/sessions/${encodeURIComponent(sessionName)}`, { method: 'DELETE' });
+      const origin = serverName ? ServerManager.getOrigin(serverName) : '';
+      await fetch(`${origin}/api/sessions/${encodeURIComponent(sessionName)}`, { method: 'DELETE' });
       await refresh();
     } catch (err) { await App.showModal('Failed to kill session: ' + err.message, 'OK'); }
   }
