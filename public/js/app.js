@@ -3,7 +3,7 @@
  * Network probing is in app-network.js (AppNetwork).
  */
 
-/* global Dashboard, TerminalView, AppNetwork, FileBrowser, FileEditor, FileUpload, ServerManager */
+/* global Dashboard, TerminalView, AppNetwork, FileBrowser, FileEditor, FileUpload, ServerManager, SettingsPanel */
 
 const App = (() => {
   let currentView = 'dashboard';
@@ -233,6 +233,7 @@ const App = (() => {
     FileBrowser.init();
     FileEditor.init();
     FileUpload.init();
+    SettingsPanel.init();
     handleRoute();
     startVersionPolling();
     initConnectivityToasts();

@@ -308,6 +308,47 @@
 .server-reconnect-btn:hover { color: var(--accent); }
 .server-group-right { display: flex; align-items: center; gap: 8px; }
 
+/* ========== Settings Panel ========== */
+.settings-overlay {
+  position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,0.7);
+  display: flex; justify-content: center; align-items: flex-start; padding-top: 60px;
+}
+.settings-overlay.hidden { display: none; }
+.settings-panel {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  width: 90%; max-width: 560px; max-height: 80vh; overflow-y: auto; padding: 24px;
+}
+.settings-panel h2 { font-family: var(--sans); font-size: 16px; margin-bottom: 16px; }
+.settings-server-entry {
+  background: var(--surface-raised); border: 1px solid var(--border); border-radius: 8px;
+  padding: 12px; margin-bottom: 12px;
+}
+.settings-server-entry label {
+  font-family: var(--mono); font-size: 11px; color: var(--text-dim);
+  text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 4px; margin-top: 8px;
+}
+.settings-server-entry label:first-child { margin-top: 0; }
+.settings-server-entry input {
+  width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 4px;
+  color: var(--text); font-family: var(--mono); font-size: 13px; padding: 6px 8px;
+}
+.settings-server-entry input:focus { outline: none; border-color: var(--accent); }
+.settings-server-remove {
+  background: none; border: none; color: var(--danger); cursor: pointer;
+  font-family: var(--mono); font-size: 11px; padding: 4px 8px; margin-top: 8px;
+  border-radius: 4px;
+}
+.settings-server-remove:hover { background: var(--danger-dim); }
+.settings-actions {
+  display: flex; gap: 8px; margin-top: 16px; justify-content: space-between;
+}
+.settings-add-btn {
+  background: none; border: 1px dashed var(--border); border-radius: 8px;
+  color: var(--text-dim); cursor: pointer; padding: 12px; width: 100%;
+  font-family: var(--mono); font-size: 12px; margin-bottom: 12px;
+}
+.settings-add-btn:hover { border-color: var(--accent); color: var(--accent); }
+
 /* ========== Dashboard Responsive ========== */
 @media (max-width: 768px) {
   #session-list { grid-template-columns: 1fr; }
