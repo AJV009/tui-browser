@@ -159,11 +159,7 @@ TUI Browser requires [Tailscale](https://tailscale.com/) for network access. Tai
 
 After running `./install.sh` on a new machine, a few extra steps may be needed:
 
-**File browser icons:** The 1,480+ vscode-icons SVGs are gitignored and generated locally. If the file browser shows no icons, copy them from a machine that has them:
-```bash
-rsync -a primary-machine:~/project/tui-browser/public/icons/ ~/project/tui-browser/public/icons/
-```
-Or regenerate with `bash scripts/bundle-vscode-icons.sh` (requires npm in PATH).
+**File browser icons:** The vscode-icons SVGs are gitignored and generated locally. If the file browser shows no icons, regenerate with `bash scripts/bundle-vscode-icons.sh` (requires npm in PATH).
 
 **Node.js via nvm:** If using nvm instead of Volta or system Node, ensure the systemd unit can find Node. Check that `ExecStart` in `~/.config/systemd/user/tui-browser.service` points to the correct Node binary and `PATH` includes your nvm bin directory.
 
