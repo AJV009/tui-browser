@@ -48,6 +48,15 @@ function setup(app, { discovery, sessions, kittyDiscovery, state, aiTitles, conf
     detail.webClients = sessions.getClientCount(detail.name);
     const dt = displayTitles.get(detail.name);
     if (dt && dt.title) detail.displayTitle = dt.title;
+    // tui.json overrides
+    const tuiOverrides = require('./tui-overrides');
+    const cwd = state.originCwds[detail.name] || detail.panes?.[0]?.cwd || '';
+    const overrides = tuiOverrides.getTuiOverrides(detail.name, cwd);
+    if (overrides) {
+      if (overrides.title && (!dt || !dt.manuallyRenamed)) detail.displayTitle = overrides.title;
+      if (overrides.actions) detail.actions = overrides.actions;
+      if (overrides.fileCwd) detail.fileCwd = overrides.fileCwd;
+    }
     res.json(detail);
   }));
 
@@ -113,6 +122,13 @@ function setup(app, { discovery, sessions, kittyDiscovery, state, aiTitles, conf
   app.get('/api/discover', apiHandler(async (_req, res) => {
     const result = await discovery.discoverAll();
     annotate(result.sessions);
+    // tui.json title overrides (takes precedence unless manually renamed via UI)
+    for (const s of result.sessions) {
+      if (s.tuiTitle) {
+        const dt = displayTitles.get(s.name);
+        if (!dt || !dt.manuallyRenamed) s.displayTitle = s.tuiTitle;
+      }
+    }
     res.json(result);
   }));
 

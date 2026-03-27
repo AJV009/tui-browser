@@ -73,10 +73,6 @@ serversConfig.setupRoutes(app);
 const selfUpdate = require('./update');
 selfUpdate.setupRoutes(app);
 
-// ---------- AI Auto-Title Loop ----------
-
-aiTitles.startAutoTitleLoop(state, discovery);
-
 // ---------- HTTP + HTTPS ----------
 
 const server = http.createServer(app);

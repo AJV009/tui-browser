@@ -3,6 +3,8 @@
  */
 
 const { exec } = require('./exec-util');
+const tuiOverrides = require('./tui-overrides');
+const state = require('./state');
 
 async function isTmuxAvailable() {
   try {
@@ -42,6 +44,7 @@ const PANE_FORMAT = [
   '#{pane_height}',
   '#{pane_active}',
   '#{pane_title}',
+  '#{pane_current_path}',
 ].join(SEP);
 
 const CLIENT_FORMAT = ['#{client_pid}', '#{session_name}'].join(SEP);
@@ -84,7 +87,7 @@ async function listPanes(sessionName) {
   if (!raw) return [];
 
   return raw.split('\n').map((line) => {
-    const [id, tty, pid, command, width, height, active, title] = line.split(SEP);
+    const [id, tty, pid, command, width, height, active, title, cwd] = line.split(SEP);
     return {
       id,
       tty,
@@ -94,6 +97,7 @@ async function listPanes(sessionName) {
       height: parseInt(height, 10),
       active: active === '1',
       title: title || '',
+      cwd: cwd || '',
     };
   });
 }
@@ -170,6 +174,18 @@ async function discoverAll() {
     ...s,
     kittyWindows: matchedKittyBySession.get(s.name) || [],
   }));
+
+  // tui.json overrides — auto-discover from origin CWD (or live pane cwd as fallback)
+  tuiOverrides.refreshTuiFiles(sessions, state.originCwds);
+  for (const s of sessions) {
+    const cwd = state.originCwds[s.name] || s.panes?.[0]?.cwd || '';
+    const overrides = tuiOverrides.getTuiOverrides(s.name, cwd);
+    if (overrides) {
+      if (overrides.title) s.tuiTitle = overrides.title;
+      if (overrides.fileCwd) s.fileCwd = overrides.fileCwd;
+      if (overrides.actions) s.actions = overrides.actions;
+    }
+  }
 
   return { sessions, unmatchedKitty };
 }

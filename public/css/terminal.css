@@ -77,6 +77,19 @@
 
 .claude-remote-btn:hover { background: #da775644; color: #e8956f; }
 
+#tui-actions-container { display: inline-flex; gap: 4px; align-items: center; }
+.tui-action-btn {
+  font-family: var(--mono);
+  font-size: 11px;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid var(--accent-dim);
+  background: var(--accent-dim);
+  color: var(--accent);
+  white-space: nowrap;
+}
+.tui-action-btn:hover { background: var(--surface-hover); border-color: var(--accent); }
+
 /* ========== Zoom Pill ========== */
 .zoom-pill {
   display: flex; flex-direction: column; align-items: center;

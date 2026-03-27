@@ -3,7 +3,7 @@
  * Controls (scroll, text select, quickbar, session ops) are in terminal-controls.js.
  */
 
-/* global Terminal, FitAddon, WebglAddon, App, TerminalControls, ServerManager */
+/* global Terminal, FitAddon, WebglAddon, App, TerminalControls, ServerManager, FileEditor */
 
 const TerminalView = (() => {
   let term = null;
@@ -268,6 +268,7 @@ const TerminalView = (() => {
 
       if (!isTouchUser) term.focus();
       checkClaudeStatus(sessionName, serverName);
+      loadTuiActions(sessionName, serverName);
 
       const pending = connectResolvers.splice(0);
       pending.forEach(r => r.resolve());
@@ -330,6 +331,7 @@ const TerminalView = (() => {
     TerminalTextInput.close();
     TerminalNotes.closeNotes();
     hideClaudeRemote();
+    clearTuiActions();
     if (ws) { ws.onclose = null; ws.close(); ws = null; }
     currentSession = null;
     setStatus('', 'Disconnected');
@@ -350,6 +352,46 @@ const TerminalView = (() => {
   function hideClaudeRemote() {
     claudeRemoteUrl = null;
     document.getElementById('claude-remote-btn').style.display = 'none';
+  }
+
+  // ---------- tui.json Action Buttons ----------
+
+  async function loadTuiActions(sessionName, serverName) {
+    try {
+      const origin = serverName ? ServerManager.getOrigin(serverName) : '';
+      const res = await fetch(`${origin}/api/sessions/${encodeURIComponent(sessionName)}`);
+      const data = await res.json();
+      renderTuiActions(data.actions || [], serverName);
+      if (data.displayTitle) {
+        document.getElementById('terminal-session-name').textContent = data.displayTitle;
+      }
+    } catch { /* ignore */ }
+  }
+
+  function renderTuiActions(actions, serverName) {
+    const container = document.getElementById('tui-actions-container');
+    container.innerHTML = '';
+    for (const action of actions) {
+      const btn = document.createElement('button');
+      btn.className = 'toolbar-icon-btn tui-action-btn';
+      btn.title = action.label;
+      btn.textContent = action.label;
+      btn.addEventListener('click', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        if (action.type === 'url') {
+          window.open(action.url, '_blank');
+        } else if (action.type === 'file-open') {
+          const origin = serverName ? ServerManager.getOrigin(serverName) : '';
+          FileEditor.open(action.path, origin);
+        }
+      });
+      container.appendChild(btn);
+    }
+  }
+
+  function clearTuiActions() {
+    const container = document.getElementById('tui-actions-container');
+    if (container) container.innerHTML = '';
   }
 
   function setStatus(state, text) {

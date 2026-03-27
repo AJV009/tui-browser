@@ -1,5 +1,5 @@
 /**
- * state.js — Persistent server state (display titles, locked sessions, idle expiry).
+ * state.js — Persistent server state (display titles, locked sessions, idle expiry, origin CWDs).
  * Shared across routes and AI title modules.
  */
 
@@ -51,6 +51,19 @@ try {
 function saveExpiry() {
   try {
     fs.writeFileSync(expiryPath, JSON.stringify(Object.fromEntries(idleExpiry), null, 2));
+  } catch { /* ignore */ }
+}
+
+// Origin CWDs: tmuxName → absolute path where the session was created
+const originCwds = {};
+const cwdsPath = path.join(dataDir, 'origin-cwds.json');
+try {
+  Object.assign(originCwds, JSON.parse(fs.readFileSync(cwdsPath, 'utf8')));
+} catch { /* no saved cwds */ }
+
+function saveOriginCwds() {
+  try {
+    fs.writeFileSync(cwdsPath, JSON.stringify(originCwds, null, 2));
   } catch { /* ignore */ }
 }
 
@@ -114,6 +127,8 @@ module.exports = {
   saveTitles,
   lockedSessions,
   saveLocks,
+  originCwds,
+  saveOriginCwds,
   SHELL_NAMES,
   annotateSessions,
 };

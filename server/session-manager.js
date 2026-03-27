@@ -10,6 +10,7 @@ const pty = require('node-pty');
 const { spawn } = require('child_process');
 const { exec } = require('./exec-util');
 const { isKittyRemoteAvailable } = require('./kitty-discovery');
+const state = require('./state');
 
 // Locale env for tmux UTF-8 support (also in scripts/tmux-kitty-shell)
 const LOCALE_ENV = { LANG: 'en_IN.UTF-8', LC_ALL: 'en_IN.UTF-8' };
@@ -162,6 +163,16 @@ async function createSession(name, command = 'bash', cols = 80, rows = 24, cwd, 
     args.push('-c', cwd);
   }
   await exec('tmux', args);
+
+  // Record the origin CWD (immutable — used for tui.json discovery)
+  try {
+    const initialCwd = await exec('tmux', ['display', '-t', name, '-p', '#{pane_current_path}']);
+    const trimmed = initialCwd.trim();
+    if (trimmed) {
+      state.originCwds[name] = trimmed;
+      state.saveOriginCwds();
+    }
+  } catch { /* best effort */ }
 
   // Send the command as keystrokes so the session keeps a live shell
   if (command && command !== 'bash') {

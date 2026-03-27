@@ -304,10 +304,16 @@ function setup(app) {
 
   // Get CWD of a tmux session
   const { exec: run } = require('./exec-util');
+  const tuiOverrides = require('./tui-overrides');
 
   app.get('/api/files/cwd', apiHandler(async (req, res) => {
     const session = req.query.session;
     if (!session) return res.status(400).json({ error: 'session parameter required' });
+
+    // Check tui.json fileCwd override first
+    const override = tuiOverrides.getFileCwd(session);
+    if (override) return res.json({ path: override });
+
     try {
       const cwd = await run('tmux', ['display', '-t', session, '-p', '#{pane_current_path}']);
       const trimmed = cwd.trim();
