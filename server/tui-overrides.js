@@ -26,11 +26,13 @@ let globalIndex = new Map();
  * @param {Object} originCwds - Map of sessionName → origin CWD path
  */
 function refreshTuiFiles(sessions, originCwds) {
-  // Collect unique CWDs to check
+  // Collect unique CWDs to check (both origin and live — tui.json may be at either)
   const cwds = new Set();
   for (const s of sessions) {
-    const cwd = originCwds[s.name] || s.panes?.[0]?.cwd || '';
-    if (cwd) cwds.add(cwd);
+    const origin = originCwds[s.name];
+    const live = s.panes?.[0]?.cwd;
+    if (origin) cwds.add(origin);
+    if (live) cwds.add(live);
   }
 
   const newIndex = new Map();
