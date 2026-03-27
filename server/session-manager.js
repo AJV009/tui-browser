@@ -9,9 +9,57 @@
 const pty = require('node-pty');
 const { spawn } = require('child_process');
 const { exec } = require('./exec-util');
+const { isKittyRemoteAvailable } = require('./kitty-discovery');
 
 // Locale env for tmux UTF-8 support (also in scripts/tmux-kitty-shell)
 const LOCALE_ENV = { LANG: 'en_IN.UTF-8', LC_ALL: 'en_IN.UTF-8' };
+
+// Cached Kitty socket path (resolved on first use)
+let kittySocket = undefined; // undefined = not yet checked, null = unavailable
+
+/**
+ * Open a Kitty OS window attached to a tmux session.
+ * Uses kitten @ launch to join the existing Kitty instance (enables tab dragging).
+ * Falls back to spawning a new kitty process if remote control is unavailable.
+ */
+async function launchKittyWindow(name) {
+  // Discover socket on first call, cache result
+  if (kittySocket === undefined) {
+    try {
+      const result = await isKittyRemoteAvailable();
+      kittySocket = result.available ? result.socket : null;
+    } catch {
+      kittySocket = null;
+    }
+  }
+
+  // Try kitten @ launch (joins existing Kitty instance)
+  if (kittySocket) {
+    try {
+      const args = ['@', '--to', `unix:${kittySocket}`, 'launch',
+        '--type=os-window', 'tmux', '-u', 'attach-session', '-t', name];
+      await exec('kitten', args);
+      return;
+    } catch (err) {
+      console.warn(`[session-manager] kitten @ launch failed, falling back to spawn:`, err.message);
+    }
+  }
+
+  // Fallback: spawn a new kitty process
+  try {
+    const kittyProc = spawn('kitty', ['-e', 'tmux', '-u', 'attach-session', '-t', name], {
+      detached: true,
+      stdio: 'ignore',
+      env: { ...process.env, ...LOCALE_ENV },
+    });
+    kittyProc.on('error', (err) => {
+      console.warn(`[session-manager] Kitty launch failed for session ${name}:`, err.message);
+    });
+    kittyProc.unref();
+  } catch (err) {
+    console.warn(`[session-manager] Kitty launch failed for session ${name}:`, err.message);
+  }
+}
 
 // sessionName → { proc: pty.IPty, clients: Set<WebSocket> }
 const activeSessions = new Map();
@@ -122,19 +170,7 @@ async function createSession(name, command = 'bash', cols = 80, rows = 24, cwd, 
 
   // Best-effort: open a Kitty window attached to this session
   if (openKitty) {
-    try {
-      const kittyProc = spawn('kitty', ['-e', 'tmux', '-u', 'attach-session', '-t', name], {
-        detached: true,
-        stdio: 'ignore',
-        env: { ...process.env, ...LOCALE_ENV },
-      });
-      kittyProc.on('error', (err) => {
-        console.warn(`[session-manager] Kitty launch failed for session ${name}:`, err.message);
-      });
-      kittyProc.unref();
-    } catch (err) {
-      console.warn(`[session-manager] Kitty launch failed for session ${name}:`, err.message);
-    }
+    launchKittyWindow(name);
   }
 
   return { name, command };
@@ -144,19 +180,7 @@ async function createSession(name, command = 'bash', cols = 80, rows = 24, cwd, 
  * Open a Kitty window attached to an existing tmux session.
  */
 function openTerminal(name) {
-  try {
-    const kittyProc = spawn('kitty', ['-e', 'tmux', '-u', 'attach-session', '-t', name], {
-      detached: true,
-      stdio: 'ignore',
-      env: { ...process.env, ...LOCALE_ENV },
-    });
-    kittyProc.on('error', (err) => {
-      console.warn(`[session-manager] Kitty launch failed for session ${name}:`, err.message);
-    });
-    kittyProc.unref();
-  } catch (err) {
-    console.warn(`[session-manager] Kitty launch failed for session ${name}:`, err.message);
-  }
+  launchKittyWindow(name);
 }
 
 /**

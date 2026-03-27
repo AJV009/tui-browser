@@ -157,7 +157,7 @@ const TerminalView = (() => {
     // Reconnect button
     document.getElementById('reconnect-btn').addEventListener('click', (e) => {
       e.preventDefault(); e.stopPropagation();
-      if (currentSession) connect(currentSession);
+      if (currentSession) connect(currentSession, App.getCurrentServer());
     });
 
     // Claude remote control button — click to copy, double-click to open
@@ -319,7 +319,7 @@ const TerminalView = (() => {
         reject(e) { clearTimeout(timer); reject(e); },
       };
       connectResolvers.push(entry);
-      if (!ws || ws.readyState !== WebSocket.CONNECTING) connect(currentSession);
+      if (!ws || ws.readyState !== WebSocket.CONNECTING) connect(currentSession, App.getCurrentServer());
     });
   }
 
