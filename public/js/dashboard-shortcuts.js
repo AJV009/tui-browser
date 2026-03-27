@@ -312,9 +312,11 @@ const DashboardShortcuts = (() => {
     const base = shortcut.label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
     const name = base + '-' + Date.now().toString(36).slice(-4);
     document.getElementById('new-session-name').value = name;
-    document.getElementById('new-session-cmd').value = shortcut.command;
+    const cmdInput = document.getElementById('new-session-cmd');
+    cmdInput.value = shortcut.command;
     setTargetServer(serverName || 'HOST');
-    document.getElementById('new-session-cmd').focus();
+    cmdInput.focus();
+    cmdInput.setSelectionRange(cmdInput.value.length, cmdInput.value.length);
   }
 
   return { init, getTargetServer };
