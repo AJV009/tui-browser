@@ -34,11 +34,12 @@ Built for TUI-heavy workflows (Claude Code, OpenCode, Codex, htop, etc.) where y
 - **VNC-style mirroring** — browser and Kitty terminal show the exact same content. Type in either, both update.
 - **Session management** — create, connect, kill, rename sessions from the browser. New sessions also open a Kitty window on the host.
 - **Multi-client** — multiple browsers can connect to the same session simultaneously.
-- **AI session titles** — uses Claude CLI (haiku) to auto-generate contextual session names from terminal output.
+- **AI session titles** — on-demand AI title generation via the title button in terminal view (uses Claude CLI haiku model).
 - **Claude Code detection** — auto-detects Claude Code sessions and shows a Claude icon button when remote-control is active. Click to copy the URL, double-click to open it.
 - **Text input panel** — compose text and send it to the terminal in one shot (like paste), avoids mobile keystroke drops. Pen icon in the quick-keys bar.
 - **File browser** — per-server file manager accessible from each server group and terminal view. Browse, view, edit, upload, and download files. Opens to the terminal session's working directory.
 - **Multi-machine federation** — connect multiple computers to one dashboard. Each machine runs its own tui-browser server; the client connects directly to each. Sessions are grouped by server with collapsible sections.
+- **tui.json session overrides** — drop a `tui.json` in a project directory to customize sessions launched from there: custom titles, action buttons (URL links, file openers), and file browser CWD overrides. Auto-discovered, no API calls needed. See [tui.json format](#tuijson-overrides).
 - **Mobile-optimized** — quick-keys bar (toggleable on all screen sizes), scroll controls, text selection overlay, keyboard-aware viewport.
 
 ### Dashboard & Session Tools
@@ -135,6 +136,35 @@ shell /path/to/your/.local/bin/tmux-kitty-shell
 ```
 
 Restart Kitty. Every new window will launch inside tmux, and the dashboard will show them with Kitty badges.
+
+### tui.json Overrides
+
+Drop a `tui.json` file in any project directory to customize sessions launched from there. TUI Browser auto-discovers the file by checking each session's working directory during polling — no API calls or registration needed.
+
+```json
+{
+  "my-project-id": {
+    "title": "Custom Title",
+    "fileCwd": "/path/to/project/working/dir",
+    "sessions": ["session-name-abc1", "session-name-xyz9"],
+    "actions": [
+      { "id": "docs", "label": "Docs", "icon": "drupal", "type": "url", "url": "https://example.com" },
+      { "id": "notes", "label": "Notes", "icon": "comment", "type": "file-open", "path": "/path/to/notes.md" }
+    ]
+  }
+}
+```
+
+**Fields per entry:**
+- `title` — overrides the session's display title (manual UI rename still takes precedence)
+- `fileCwd` — overrides the file browser's default directory for this session
+- `sessions` — array of tmux session names this entry applies to (the key can be any stable identifier)
+- `actions` — buttons shown in the terminal toolbar:
+  - `type: "url"` — opens the URL in a new browser tab
+  - `type: "file-open"` — opens the file directly in the CodeMirror editor
+  - `icon` — optional, renders an SVG icon instead of text label. Built-in: `drupal`, `comment`
+
+**How it works:** Scripts that launch sessions (e.g., via Quick Launch) write/update `tui.json` before starting. The server records each session's origin CWD at creation time and checks for `tui.json` there during every discovery cycle (cached by mtime). Later, other tools (like Claude Code skills) can update the same file to add actions — changes appear within 3 seconds.
 
 ## Network Access (Tailscale)
 
