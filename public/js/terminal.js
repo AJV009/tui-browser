@@ -12,6 +12,7 @@ const TerminalView = (() => {
   let ws = null;
   let currentSession = null;
   let heartbeatInterval = null;
+  let tuiPollInterval = null;
   let claudeRemoteUrl = null;
   let connectResolvers = [];
   let isTouchUser = false;
@@ -269,6 +270,8 @@ const TerminalView = (() => {
       if (!isTouchUser) term.focus();
       checkClaudeStatus(sessionName, serverName);
       loadTuiActions(sessionName, serverName);
+      if (tuiPollInterval) clearInterval(tuiPollInterval);
+      tuiPollInterval = setInterval(() => loadTuiActions(sessionName, serverName), 30000);
 
       const pending = connectResolvers.splice(0);
       pending.forEach(r => r.resolve());
@@ -332,6 +335,7 @@ const TerminalView = (() => {
     TerminalNotes.closeNotes();
     hideClaudeRemote();
     clearTuiActions();
+    if (tuiPollInterval) { clearInterval(tuiPollInterval); tuiPollInterval = null; }
     if (ws) { ws.onclose = null; ws.close(); ws = null; }
     currentSession = null;
     setStatus('', 'Disconnected');
