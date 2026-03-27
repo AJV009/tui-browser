@@ -91,9 +91,7 @@ const App = (() => {
     if (toastTimer) clearTimeout(toastTimer);
     toast.textContent = message;
     toast.className = `toast toast-${type} visible`;
-    if (duration) {
-      toastTimer = setTimeout(() => { toast.classList.remove('visible'); }, duration);
-    }
+    toastTimer = setTimeout(() => { toast.classList.remove('visible'); }, duration || 3000);
   }
 
   function formatTimestamp(ms) {
