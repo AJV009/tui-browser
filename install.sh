@@ -201,6 +201,7 @@ Environment=LC_ALL=en_IN.UTF-8
 Environment=PORT=7483
 Environment=BIND=$TAILSCALE_IP
 ExecStart=$NODE_BIN $SCRIPT_DIR/server/index.js
+KillMode=process
 Restart=on-failure
 RestartSec=3
 
