@@ -419,7 +419,7 @@ Each machine runs its own independent tui-browser server. The primary server hos
 
 ## Why Not Just SSH?
 
-SSH-based web terminals (WeTTY, shellinabox) and terminal sharing tools solve a different problem. They give you a *new* shell session in your browser. TUI Browser gives you your *existing* session — the one already running on your desktop.
+Every tool in this space either **creates new sessions** or **requires you to go through it**. TUI Browser does neither — it discovers your running tmux sessions and gives you a web view into them. The terminal sessions are the source of truth; the web layer is a lens, not a replacement.
 
 **The core difference is mirroring vs. remoting:**
 
@@ -434,19 +434,82 @@ SSH-based web terminals (WeTTY, shellinabox) and terminal sharing tools solve a 
 
 **Why WebSocket instead of SSH for transport?** SSH multiplexes its own channels and requires key/password auth on every connection — overhead that adds nothing when the server and terminal are on the same machine. WebSocket gives us raw bidirectional binary streaming over HTTPS with custom input batching (30ms buffer), JSON control messages for resize/attach/detach, and reconnection logic that SSH can't express. The browser connects to a local node-pty process that attaches to tmux — there's no remote host to SSH into.
 
-### Similar tools and how they compare
+<details>
+<summary><strong>Alternatives comparison</strong> — how every major tool in this space differs</summary>
 
-| Tool | What it does | Key difference from TUI Browser |
-|------|-------------|------|
-| **ttyd** | Exposes a single terminal process to the browser | One-shot PTY — no session persistence, no mirroring, no dashboard |
-| **GoTTY** | Same concept as ttyd, in Go | Same limitations — single terminal, no multi-client sync |
-| **WeTTY** | SSH client in the browser (Node.js) | Spawns new SSH sessions — doesn't mirror your existing terminal |
-| **sshx** | Collaborative terminal sharing with multiplayer cursors | Separate sessions per user with shared view — no host terminal integration |
-| **tmate** | tmux fork for instant session sharing | Fork of tmux (not the real thing) — designed for pair programming, not mobile access to your own sessions |
-| **Upterm** | Terminal sharing via link | Focused on sharing with others, not on accessing your own sessions from your phone |
-| **Wave Terminal** | AI-powered desktop terminal app | Desktop app, not a web remote — different category entirely |
+### Web-Based Terminal Servers
 
-TUI Browser sits in a unique spot: it's a **personal terminal dashboard** that mirrors your real desktop sessions to your phone/tablet, with session discovery, lifecycle management, and a mobile-optimized UI. The closest analogy is VNC — but for your terminal, not your whole screen.
+Tools that expose a terminal command over HTTP. The closest category to TUI Browser architecturally, but none discover or attach to existing sessions.
+
+| Tool | Stack | What it does | Attach existing tmux? | Multi-client? |
+|------|-------|-------------|----------------------|---------------|
+| **[ttyd](https://github.com/tsl0922/ttyd)** | C, libwebsockets, xterm.js | Exposes one command per port via WebSocket. ~11k stars, actively maintained. | Only via `ttyd tmux new -A -s name` — no discovery, no dashboard, one session per instance. | Via tmux sharing only. |
+| **[GoTTY](https://github.com/sorenisanerd/gotty)** | Go | Same concept as ttyd. Original repo unmaintained; maintained fork by sorenisanerd. | Same indirect approach as ttyd. | Via tmux sharing only. |
+| **[Zellij](https://github.com/zellij-org/zellij)** | Rust | Terminal multiplexer with a built-in web client (v0.44+). Sessions map to URLs, multi-client support, session resurrection. | Attaches to Zellij sessions, not tmux — requires replacing your multiplexer entirely. | Yes, native. |
+
+**ttyd** is the closest lightweight alternative — but it's a "run one command" tool. You'd need to spawn/kill ttyd instances dynamically and build a discovery layer on top, which is essentially what TUI Browser already does with node-pty. Swapping node-pty for ttyd adds a process boundary without gaining anything.
+
+**Zellij** is the most architecturally similar — web access, session URLs, multi-client — but it replaces tmux rather than wrapping it, and adds significant in-terminal UI chrome and latency.
+
+### Browser-Based SSH Proxies
+
+These put an SSH client in the browser by proxying through a server: `Browser → WebSocket → server-side SSH client → sshd → shell`. Each browser tab gets its own SSH session — no sharing.
+
+| Tool | Stack | Notes |
+|------|-------|-------|
+| **[WeTTy](https://github.com/butlerx/wetty)** | Node.js/TypeScript | ~5k stars. Web wrapper around SSH. Can technically `tmux attach` inside the SSH session, but each tab is independent. |
+| **[WebSSH2](https://github.com/billchurch/webssh2)** | Node.js/TypeScript | ~2.7k stars. SSH via Socket.io + ssh2 library. Host key verification (TOFU). |
+| **[Sshwifty](https://github.com/nirui/sshwifty)** | Go | ~3k stars. SSH + Telnet client. Single binary. Connection presets. |
+
+All of these add an SSH hop compared to TUI Browser's direct `WebSocket → node-pty → tmux attach` path. They're designed for accessing remote machines from a browser, not for mirroring your own desktop terminal.
+
+### Terminal Sharing / Collaboration
+
+Tools designed for sharing your terminal with others. They create or wrap sessions for collaborative access — different goal than personal mobile access.
+
+| Tool | Stack | What it does | Attach existing tmux? |
+|------|-------|-------------|----------------------|
+| **[tmate](https://github.com/tmate-io/tmate)** | C (tmux fork) | ~6k stars. Forks tmux itself, tunnels via SSH to a relay server. Read-only and read-write URLs. Self-hostable server. | **No** — creates its own tmux sessions. Cannot attach to existing ones. |
+| **[sshx](https://github.com/ekzhang/sshx)** | Rust | ~7k stars. Infinite canvas with multiple terminal panes, real-time collaboration cursors, E2E encrypted. | **No** — creates its own sessions. |
+| **[Upterm](https://github.com/owenthereal/upterm)** | Go | ~1.2k stars. Reverse SSH tunnel, collaborators connect via standard `ssh` command. Self-hostable relay. | Shares the current command/shell, not tmux-aware. |
+| **[TermPair](https://github.com/cs01/termpair)** | Python | ~1.7k stars. AES-GCM E2E encrypted, server is a blind router. Multiple browser viewers. | Shares the terminal it runs in — not tmux-specific. |
+| **[WebTTY](https://github.com/maxmcd/webtty)** | Go | ~2.8k stars. **WebRTC peer-to-peer** — no relay server for data. Signaling via copy-paste. | **No** — single host, single viewer. |
+| **[tty-share](https://github.com/elisescu/tty-share)** | Go | Shareable URL for your terminal. Browser or CLI viewer. | No tmux integration. |
+
+### Native Resilient Connections (No Browser)
+
+These solve connection resilience (surviving network changes, sleep/wake) but have no browser story. Great for terminal-to-terminal access alongside TUI Browser.
+
+| Tool | Transport | Key advantage | Limitation |
+|------|-----------|--------------|------------|
+| **[Mosh](https://mosh.org/)** | UDP (State Sync Protocol) | Survives IP changes, sleep/wake, high latency. Predictive local echo makes typing feel instant. | No scrollback (need tmux), no port forwarding, requires UDP 60000-61000 open. No browser client (Chrome NaCl extension is dead). |
+| **[Eternal Terminal](https://github.com/MisterTea/EternalTerminal)** | TCP | Like Mosh but with scrollback, port forwarding, uses TCP (easier firewalls). Auto-reconnects seamlessly. | No browser client. C++, ~3.6k stars. |
+
+Both can attach to existing tmux sessions (`mosh host -- tmux attach`, `et host -c "tmux attach"`). They complement TUI Browser — use them from a real terminal, use TUI Browser from a browser.
+
+### Enterprise / Heavyweight
+
+| Tool | Stack | Notes |
+|------|-------|-------|
+| **[Apache Guacamole](https://guacamole.apache.org/)** | Java + C daemon (guacd) | Clientless remote desktop gateway — SSH, RDP, VNC, Telnet, Kubernetes. Server-side terminal rendering (not xterm.js). Multi-user viewing, session recording, SFTP. Heavy infrastructure (Java webapp + guacd + database). |
+| **[JumpServer](https://github.com/jumpserver/jumpserver)** | Python/Django | ~30k stars. Full PAM platform — RBAC, audit trails, session recording, AD/LDAP/SAML. SSH, RDP, VNC, K8s, databases. Enterprise access management. |
+
+Both are designed for multi-user access governance, not personal terminal mirroring.
+
+### Protocol Comparison
+
+| Approach | Transport | Path to terminal | Trade-off |
+|----------|-----------|-----------------|-----------|
+| **TUI Browser** | WebSocket (TCP) | `Browser → WS → node-pty → tmux attach` | Direct, minimal hops. No auth overhead (Tailscale handles it). |
+| **SSH proxies** | WebSocket → SSH (TCP) | `Browser → WS → ssh2 → sshd → shell` | Extra hop + SSH auth on every connection. |
+| **Mosh** | UDP | `Client → SSP → mosh-server → shell` | State sync (not stream), survives network changes. No browser. |
+| **Guacamole** | WebSocket → Guacamole protocol (TCP) | `Browser → WS → Java → guacd → SSH/VNC` | Server-side rendering. Heavy but protocol-agnostic. |
+| **WebRTC** | UDP (P2P) | `Browser → DataChannel → peer` | True P2P after signaling. Not widely adopted for terminals. |
+| **tmate** | SSH (TCP) | `tmate client → msgpack → relay → SSH → viewer` | tmux state sync over SSH tunnel. Can't attach to real tmux. |
+
+</details>
+
+TUI Browser sits in a unique spot: it's a **stateless web bridge to your existing terminal sessions** — it discovers running tmux sessions, exposes them over WebSocket, and lets multiple clients attach without configuration. The terminal sessions are the source of truth; the web layer is a view into them, not a replacement. No other tool does this.
 
 ---
 
