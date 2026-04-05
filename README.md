@@ -12,8 +12,8 @@
 <p align="center">
   <a href="#quick-start">Quick Start</a> &middot;
   <a href="#features">Features</a> &middot;
-  <a href="#why-not-just-ssh">Why Not SSH?</a> &middot;
-  <a href="#api">API</a>
+  <a href="#how-it-works">How It Works</a> &middot;
+  <a href="#why-not-just-ssh">Why Not SSH?</a>
 </p>
 
 ---
@@ -166,200 +166,6 @@ Drop a `tui.json` file in any project directory to customize sessions launched f
 
 **How it works:** Scripts that launch sessions (e.g., via Quick Launch) write/update `tui.json` before starting. The server records each session's origin CWD at creation time and checks for `tui.json` there during every discovery cycle (cached by mtime). Later, other tools (like Claude Code skills) can update the same file to add actions — changes appear within 3 seconds.
 
-## Network Access (Tailscale)
-
-TUI Browser requires [Tailscale](https://tailscale.com/) for network access. Tailscale creates an encrypted mesh VPN — the server binds exclusively to its Tailscale IP and is invisible to the public internet and local LAN.
-
-**Setup:**
-
-1. Install Tailscale on all machines: https://tailscale.com/download
-2. Run `tailscale up` and authenticate
-3. Run `./install.sh` — it auto-detects the Tailscale IP and binds to it
-
-**Access from any device:**
-- Install the Tailscale app (Android, iOS, macOS, Windows, Linux)
-- Join the same Tailscale network
-- Open `http://<tailscale-ip>:7483` in your browser
-
-**MagicDNS:** Tailscale assigns each machine a hostname like `machine-name.tailnet-name.ts.net`. Use these instead of raw IPs.
-
-**Custom domain (optional):** Point a DNS A record to the Tailscale IP (e.g., `tui.yourdomain.com` → `100.x.x.x`). Set the record to **DNS only** (not proxied) in your DNS provider. The domain resolves globally but only Tailscale devices can connect.
-
-### Additional Machine Setup
-
-After running `./install.sh` on a new machine, a few extra steps may be needed:
-
-**File browser icons:** The vscode-icons SVGs are gitignored and generated locally. If the file browser shows no icons, regenerate with `bash scripts/bundle-vscode-icons.sh` (requires npm in PATH).
-
-**Node.js via nvm:** If using nvm instead of Volta or system Node, ensure the systemd unit can find Node. Check that `ExecStart` in `~/.config/systemd/user/tui-browser.service` points to the correct Node binary and `PATH` includes your nvm bin directory.
-
-## Security
-
-**This tool gives full shell access and filesystem access from a browser.**
-
-TUI Browser binds exclusively to the Tailscale network interface. It is unreachable from the public internet or local LAN — only devices on your Tailscale network can connect.
-
-**Defense layers:**
-- **Network isolation** — server binds to Tailscale IP only (`BIND` env var)
-- **WireGuard encryption** — all traffic encrypted end-to-end by Tailscale
-- **Device authentication** — only devices you approve on your Tailscale account can reach the server
-- **No exposed ports** — nothing listens on public or LAN interfaces
-
-**Recommended firewall rules** (defense in depth):
-```bash
-# Block tui-browser ports on all non-Tailscale interfaces
-sudo ufw deny 7483
-sudo ufw deny 7484
-```
-
-## Service Management
-
-```bash
-# TUI Browser server
-systemctl --user start tui-browser
-systemctl --user stop tui-browser
-systemctl --user restart tui-browser
-systemctl --user status tui-browser
-journalctl --user -u tui-browser -f    # tail logs
-```
-
-## API
-
-### REST
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/discover` | Unified discovery (tmux sessions + Kitty windows) |
-| `GET` | `/api/version` | Server version + build ID + claude availability |
-| `GET` | `/api/identity` | Server name + package version (for federation) |
-| `GET` | `/api/health` | Server + tmux + Kitty status |
-| `GET` | `/api/servers` | Multi-server configuration list |
-| `PUT` | `/api/servers` | Update server list `{ servers: [{ name, url }] }` |
-| `GET` | `/api/update/status` | Check if self-update is in progress |
-| `POST` | `/api/update` | Trigger git pull + npm install + restart |
-| `GET` | `/api/sessions` | List tmux sessions |
-| `GET` | `/api/sessions/:name` | Session details + preview |
-| `GET` | `/api/sessions/:name/info` | Live session stats (memory, CPU, processes, output) |
-| `GET` | `/api/sessions/:name/claude-status` | Detect Claude Code session + remote-control URL |
-| `GET` | `/api/kitty/windows` | Kitty window discovery (debug, prefer `/api/discover`) |
-| `POST` | `/api/sessions` | Create session `{ name, command, cwd }` |
-| `POST` | `/api/sessions/bulk-kill` | Bulk kill `{ names[], filter?, inactiveMinutes? }` |
-| `POST` | `/api/sessions/:name/rename` | Rename `{ newName }` |
-| `POST` | `/api/sessions/:name/open-terminal` | Open Kitty window for session |
-| `POST` | `/api/sessions/:name/generate-title` | AI-generate session title via Claude CLI |
-| `POST` | `/api/shortcuts` | Add custom shortcut `{ label, command }` |
-| `DELETE` | `/api/sessions/:name` | Kill session |
-| **File Browser** | | |
-| `POST` | `/api/files/list` | List directory contents `{ path, showHidden? }` |
-| `POST` | `/api/files/read` | Read text file `{ path }` — returns content or binary/size flag |
-| `POST` | `/api/files/write` | Save file `{ path, content }` |
-| `POST` | `/api/files/upload` | Upload files (multipart, field: `filepond`, query: `targetDir`) |
-| `GET` | `/api/files/download` | Download file or zip folder `?path=...` |
-| `POST` | `/api/files/mkdir` | Create directory `{ path }` (recursive, idempotent) |
-| `POST` | `/api/files/rename` | Rename `{ oldPath, newPath }` — 409 if target exists |
-| `POST` | `/api/files/delete` | Delete file/folder `{ path }` (recursive for dirs) |
-| `POST` | `/api/files/move` | Move `{ src, dest, overwrite? }` — 409 if exists |
-| `POST` | `/api/files/copy` | Copy `{ src, dest, overwrite? }` — 409 if exists |
-| `GET` | `/api/files/cwd` | Get tmux session CWD `?session=name` |
-
-### WebSocket
-
-Connect to `/ws/terminal/:sessionName`:
-
-```js
-// Client → Server
-{ "type": "attach", "cols": 80, "rows": 24 }
-{ "type": "input", "data": "ls\r" }
-{ "type": "resize", "cols": 120, "rows": 40 }
-
-// Server → Client
-// Raw terminal output (ANSI preserved) or:
-{ "type": "session-ended", "sessionName": "..." }
-```
-
-## Project Structure
-
-```
-tui-browser/
-├── server/
-│   ├── index.js              # HTTP + WebSocket server orchestrator
-│   ├── routes.js             # All REST API route handlers
-│   ├── state.js              # Persistent state (display titles, locks)
-│   ├── ai-titles.js          # AI title generation via Claude CLI
-│   ├── session-manager.js    # PTY lifecycle, multi-client, Kitty launch
-│   ├── discovery.js          # tmux + unified discovery with PID matching
-│   ├── kitty-discovery.js    # Kitty remote control discovery
-│   ├── claude-detect.js      # Claude Code session + remote-control detection
-│   ├── file-routes.js        # File browser REST API (browse, edit, upload, download)
-│   ├── identity.js           # Server identity (name + version for federation)
-│   ├── servers.js            # Multi-server config CRUD (data/servers.json)
-│   ├── update.js             # Self-update endpoint (git pull + restart)
-│   └── exec-util.js          # Shared subprocess utility
-├── public/
-│   ├── index.html            # SPA shell
-│   ├── js/
-│   │   ├── app.js            # Hash router, modal, toast, version polling
-│   │   ├── server-manager.js # Multi-server connection manager + discovery aggregator
-│   │   ├── settings-panel.js # Server settings overlay (add/edit/remove servers)
-│   │   ├── dashboard.js      # Session cards, server groups, rendering, CRUD
-│   │   ├── dashboard-shortcuts.js  # Quick Launch dropdown
-│   │   ├── dashboard-bulk-kill.js  # Selection + bulk kill modal
-│   │   ├── dashboard-info.js       # Session info overlay
-│   │   ├── terminal.js       # xterm.js setup + WebSocket connection
-│   │   ├── terminal-text-input.js  # Compose-and-send text panel + quickbar toggle
-│   │   ├── terminal-controls.js    # Scroll, text select, session ops
-│   │   ├── file-browser.js         # File browser overlay (navigation, context menu, selection)
-│   │   ├── file-editor.js          # CodeMirror 6 file editor (view/edit text files)
-│   │   └── file-upload.js          # FilePond upload overlay
-│   └── css/
-│       ├── base.css           # Theme variables, header, buttons, modal
-│       ├── dashboard.css      # Session cards, toolbar, shortcuts
-│       ├── terminal.css       # Terminal view, quick-keys, scroll controls
-│       ├── info-panel.css     # Session info overlay + stats
-│       └── file-browser.css  # File browser, editor, upload, context menu styles
-│   ├── vendor/
-│   │   ├── codemirror.bundle.js  # Pre-built CodeMirror 6 (13 languages)
-│   │   └── vscode-icons.js       # Pre-built vscode-icons browser bundle
-│   └── icons/                    # vscode-icons SVGs (1,480 file type icons, gitignored)
-├── scripts/
-│   ├── tmux-kitty-shell          # Wrapper: launches Kitty windows inside tmux
-│   ├── bump-version.sh           # Pre-commit hook: auto-bump patch version
-│   ├── bundle-codemirror.sh      # One-time CodeMirror 6 build script
-│   └── bundle-vscode-icons.sh    # One-time vscode-icons build script
-├── install.sh                # One-command setup
-└── package.json
-```
-
-## Mobile Controls
-
-The terminal view includes touch-optimized controls:
-
-- **Quick-keys bar** — Esc, Tab, Ctrl+C/D/Z, arrow keys, Sel (text select), and a pen icon to open the text input panel. Always visible on mobile, toggled via the pill button on desktop/tablet.
-- **Text input panel** — compose text freely, then send to terminal in one shot. Enter sends, Shift+Enter for newlines, auto-expands up to 5 lines. Fullscreen mode for longer text.
-- **Scroll controls** — floating up/down buttons (top-right) to scroll tmux history via copy-mode
-- **Text selection** — tap Sel to open terminal output in a native-selectable overlay with Copy All
-- **Keyboard awareness** — UI shifts above the soft keyboard automatically
-- **Double-tap** a session card on the dashboard to connect directly
-
-## Kitty + tmux Gotchas
-
-Running Kitty windows inside tmux breaks a few things (tab CWD, titles, Shift+Enter). See [docs/kitty-tmux-integration.md](docs/kitty-tmux-integration.md) for fixes.
-
-## tmux Tips
-
-- **Scroll up**: mouse wheel scrolls the buffer when `mouse on` is set in `~/.tmux.conf` (the install script enables this).
-- **Select text**: hold `Shift` while clicking/dragging to use your terminal's native selection — this bypasses tmux's copy mode, which otherwise jumps to the bottom after selecting.
-- **Copy-mode (keyboard)**: `Ctrl+b` then `[` enters copy mode. Use arrow keys / `Page Up` / `Page Down` to scroll. Press `q` to exit.
-
-## AI Session Titles
-
-If the [Claude CLI](https://claude.com/claude-code) is installed, sessions can be auto-titled based on their terminal content:
-
-- **Automatic**: new sessions get a title once they cross 15 lines of output (one-time, uses haiku model)
-- **Manual**: click the sparkle icon next to the session name in terminal view to regenerate
-- **Smart context**: extracts first 150 + last 150 lines of the last command's output (skips the middle for long outputs)
-- **Human-safe**: manually renamed sessions are never auto-overwritten
-
 ## How It Works
 
 ```
@@ -414,8 +220,6 @@ Each machine runs its own independent tui-browser server. The primary server hos
    ```
 
 3. **Add the server** in the primary's dashboard via the wrench icon, using the machine's Tailscale IP or MagicDNS hostname.
-
----
 
 ## Why Not Just SSH?
 
@@ -513,10 +317,28 @@ TUI Browser sits in a unique spot: it's a **stateless web bridge to your existin
 
 ---
 
-<details>
-<summary><strong>FAQ</strong></summary>
+## Gotchas & Tips
 
-### Symlinks in the file browser point outside my allowed roots — why can't I open them?
+### Kitty + tmux
+
+Running Kitty windows inside tmux breaks a few things (tab CWD, titles, Shift+Enter). See [docs/kitty-tmux-integration.md](docs/kitty-tmux-integration.md) for fixes.
+
+### tmux Tips
+
+- **Scroll up**: mouse wheel scrolls the buffer when `mouse on` is set in `~/.tmux.conf` (the install script enables this).
+- **Select text**: hold `Shift` while clicking/dragging to use your terminal's native selection — this bypasses tmux's copy mode, which otherwise jumps to the bottom after selecting.
+- **Copy-mode (keyboard)**: `Ctrl+b` then `[` enters copy mode. Use arrow keys / `Page Up` / `Page Down` to scroll. Press `q` to exit.
+
+### AI Session Titles
+
+If the [Claude CLI](https://claude.com/claude-code) is installed, sessions can be auto-titled based on their terminal content:
+
+- **Automatic**: new sessions get a title once they cross 15 lines of output (one-time, uses haiku model)
+- **Manual**: click the sparkle icon next to the session name in terminal view to regenerate
+- **Smart context**: extracts first 150 + last 150 lines of the last command's output (skips the middle for long outputs)
+- **Human-safe**: manually renamed sessions are never auto-overwritten
+
+### File Browser Symlinks
 
 The file browser resolves symlinks to their **real path** before checking access. If a symlink inside `$HOME` points to `/opt/something`, the resolved path must fall within one of your configured `allowedRoots` in `data/file-browser-config.json` — otherwise access is denied.
 
@@ -529,6 +351,198 @@ This is intentional: symlinks should not be an escape hatch out of the allowed d
 ```
 
 Then restart the server.
+
+### Mobile Controls
+
+The terminal view includes touch-optimized controls:
+
+- **Quick-keys bar** — Esc, Tab, Ctrl+C/D/Z, arrow keys, Sel (text select), and a pen icon to open the text input panel. Always visible on mobile, toggled via the pill button on desktop/tablet.
+- **Text input panel** — compose text freely, then send to terminal in one shot. Enter sends, Shift+Enter for newlines, auto-expands up to 5 lines. Fullscreen mode for longer text.
+- **Scroll controls** — floating up/down buttons (top-right) to scroll tmux history via copy-mode
+- **Text selection** — tap Sel to open terminal output in a native-selectable overlay with Copy All
+- **Keyboard awareness** — UI shifts above the soft keyboard automatically
+- **Double-tap** a session card on the dashboard to connect directly
+
+---
+
+<details>
+<summary><strong>Network Access (Tailscale)</strong></summary>
+
+TUI Browser requires [Tailscale](https://tailscale.com/) for network access. Tailscale creates an encrypted mesh VPN — the server binds exclusively to its Tailscale IP and is invisible to the public internet and local LAN.
+
+**Setup:**
+
+1. Install Tailscale on all machines: https://tailscale.com/download
+2. Run `tailscale up` and authenticate
+3. Run `./install.sh` — it auto-detects the Tailscale IP and binds to it
+
+**Access from any device:**
+- Install the Tailscale app (Android, iOS, macOS, Windows, Linux)
+- Join the same Tailscale network
+- Open `http://<tailscale-ip>:7483` in your browser
+
+**MagicDNS:** Tailscale assigns each machine a hostname like `machine-name.tailnet-name.ts.net`. Use these instead of raw IPs.
+
+**Custom domain (optional):** Point a DNS A record to the Tailscale IP (e.g., `tui.yourdomain.com` → `100.x.x.x`). Set the record to **DNS only** (not proxied) in your DNS provider. The domain resolves globally but only Tailscale devices can connect.
+
+### Additional Machine Setup
+
+After running `./install.sh` on a new machine, a few extra steps may be needed:
+
+**File browser icons:** The vscode-icons SVGs are gitignored and generated locally. If the file browser shows no icons, regenerate with `bash scripts/bundle-vscode-icons.sh` (requires npm in PATH).
+
+**Node.js via nvm:** If using nvm instead of Volta or system Node, ensure the systemd unit can find Node. Check that `ExecStart` in `~/.config/systemd/user/tui-browser.service` points to the correct Node binary and `PATH` includes your nvm bin directory.
+
+</details>
+
+<details>
+<summary><strong>Security</strong></summary>
+
+**This tool gives full shell access and filesystem access from a browser.**
+
+TUI Browser binds exclusively to the Tailscale network interface. It is unreachable from the public internet or local LAN — only devices on your Tailscale network can connect.
+
+**Defense layers:**
+- **Network isolation** — server binds to Tailscale IP only (`BIND` env var)
+- **WireGuard encryption** — all traffic encrypted end-to-end by Tailscale
+- **Device authentication** — only devices you approve on your Tailscale account can reach the server
+- **No exposed ports** — nothing listens on public or LAN interfaces
+
+**Recommended firewall rules** (defense in depth):
+```bash
+# Block tui-browser ports on all non-Tailscale interfaces
+sudo ufw deny 7483
+sudo ufw deny 7484
+```
+
+</details>
+
+<details>
+<summary><strong>API Reference</strong></summary>
+
+### REST
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/discover` | Unified discovery (tmux sessions + Kitty windows) |
+| `GET` | `/api/version` | Server version + build ID + claude availability |
+| `GET` | `/api/identity` | Server name + package version (for federation) |
+| `GET` | `/api/health` | Server + tmux + Kitty status |
+| `GET` | `/api/servers` | Multi-server configuration list |
+| `PUT` | `/api/servers` | Update server list `{ servers: [{ name, url }] }` |
+| `GET` | `/api/update/status` | Check if self-update is in progress |
+| `POST` | `/api/update` | Trigger git pull + npm install + restart |
+| `GET` | `/api/sessions` | List tmux sessions |
+| `GET` | `/api/sessions/:name` | Session details + preview |
+| `GET` | `/api/sessions/:name/info` | Live session stats (memory, CPU, processes, output) |
+| `GET` | `/api/sessions/:name/claude-status` | Detect Claude Code session + remote-control URL |
+| `GET` | `/api/kitty/windows` | Kitty window discovery (debug, prefer `/api/discover`) |
+| `POST` | `/api/sessions` | Create session `{ name, command, cwd }` |
+| `POST` | `/api/sessions/bulk-kill` | Bulk kill `{ names[], filter?, inactiveMinutes? }` |
+| `POST` | `/api/sessions/:name/rename` | Rename `{ newName }` |
+| `POST` | `/api/sessions/:name/open-terminal` | Open Kitty window for session |
+| `POST` | `/api/sessions/:name/generate-title` | AI-generate session title via Claude CLI |
+| `POST` | `/api/shortcuts` | Add custom shortcut `{ label, command }` |
+| `DELETE` | `/api/sessions/:name` | Kill session |
+| **File Browser** | | |
+| `POST` | `/api/files/list` | List directory contents `{ path, showHidden? }` |
+| `POST` | `/api/files/read` | Read text file `{ path }` — returns content or binary/size flag |
+| `POST` | `/api/files/write` | Save file `{ path, content }` |
+| `POST` | `/api/files/upload` | Upload files (multipart, field: `filepond`, query: `targetDir`) |
+| `GET` | `/api/files/download` | Download file or zip folder `?path=...` |
+| `POST` | `/api/files/mkdir` | Create directory `{ path }` (recursive, idempotent) |
+| `POST` | `/api/files/rename` | Rename `{ oldPath, newPath }` — 409 if target exists |
+| `POST` | `/api/files/delete` | Delete file/folder `{ path }` (recursive for dirs) |
+| `POST` | `/api/files/move` | Move `{ src, dest, overwrite? }` — 409 if exists |
+| `POST` | `/api/files/copy` | Copy `{ src, dest, overwrite? }` — 409 if exists |
+| `GET` | `/api/files/cwd` | Get tmux session CWD `?session=name` |
+
+### WebSocket
+
+Connect to `/ws/terminal/:sessionName`:
+
+```js
+// Client → Server
+{ "type": "attach", "cols": 80, "rows": 24 }
+{ "type": "input", "data": "ls\r" }
+{ "type": "resize", "cols": 120, "rows": 40 }
+
+// Server → Client
+// Raw terminal output (ANSI preserved) or:
+{ "type": "session-ended", "sessionName": "..." }
+```
+
+</details>
+
+<details>
+<summary><strong>Project Structure</strong></summary>
+
+```
+tui-browser/
+├── server/
+│   ├── index.js              # HTTP + WebSocket server orchestrator
+│   ├── routes.js             # All REST API route handlers
+│   ├── state.js              # Persistent state (display titles, locks)
+│   ├── ai-titles.js          # AI title generation via Claude CLI
+│   ├── session-manager.js    # PTY lifecycle, multi-client, Kitty launch
+│   ├── discovery.js          # tmux + unified discovery with PID matching
+│   ├── kitty-discovery.js    # Kitty remote control discovery
+│   ├── claude-detect.js      # Claude Code session + remote-control detection
+│   ├── file-routes.js        # File browser REST API (browse, edit, upload, download)
+│   ├── identity.js           # Server identity (name + version for federation)
+│   ├── servers.js            # Multi-server config CRUD (data/servers.json)
+│   ├── tui-overrides.js      # tui.json discovery and caching
+│   ├── update.js             # Self-update endpoint (git pull + restart)
+│   └── exec-util.js          # Shared subprocess utility
+├── public/
+│   ├── index.html            # SPA shell
+│   ├── js/
+│   │   ├── app.js            # Hash router, modal, toast, version polling
+│   │   ├── server-manager.js # Multi-server connection manager + discovery aggregator
+│   │   ├── settings-panel.js # Server settings overlay (add/edit/remove servers)
+│   │   ├── dashboard.js      # Session cards, server groups, rendering, CRUD
+│   │   ├── dashboard-shortcuts.js  # Quick Launch dropdown
+│   │   ├── dashboard-bulk-kill.js  # Selection + bulk kill modal
+│   │   ├── dashboard-info.js       # Session info overlay
+│   │   ├── terminal.js       # xterm.js setup + WebSocket connection
+│   │   ├── terminal-text-input.js  # Compose-and-send text panel + quickbar toggle
+│   │   ├── terminal-controls.js    # Scroll, text select, session ops
+│   │   ├── terminal-notes.js       # Sent history + persistent notes scratchpad
+│   │   ├── file-browser.js         # File browser overlay (navigation, context menu, selection)
+│   │   ├── file-editor.js          # CodeMirror 6 file editor (view/edit text files)
+│   │   └── file-upload.js          # FilePond upload overlay
+│   ├── css/
+│   │   ├── base.css           # Theme variables, header, buttons, modal
+│   │   ├── dashboard.css      # Session cards, toolbar, shortcuts
+│   │   ├── terminal.css       # Terminal view, quick-keys, scroll controls
+│   │   ├── info-panel.css     # Session info overlay + stats
+│   │   └── file-browser.css   # File browser, editor, upload, context menu styles
+│   ├── vendor/
+│   │   ├── codemirror.bundle.js  # Pre-built CodeMirror 6 (13 languages)
+│   │   └── vscode-icons.js       # Pre-built vscode-icons browser bundle
+│   └── icons/                    # vscode-icons SVGs (1,480 file type icons, gitignored)
+├── scripts/
+│   ├── tmux-kitty-shell          # Wrapper: launches Kitty windows inside tmux
+│   ├── bump-version.sh           # Pre-commit hook: auto-bump patch version
+│   ├── bundle-codemirror.sh      # One-time CodeMirror 6 build script
+│   └── bundle-vscode-icons.sh    # One-time vscode-icons build script
+├── install.sh                # One-command setup
+└── package.json
+```
+
+</details>
+
+<details>
+<summary><strong>Service Management</strong></summary>
+
+```bash
+# TUI Browser server
+systemctl --user start tui-browser
+systemctl --user stop tui-browser
+systemctl --user restart tui-browser
+systemctl --user status tui-browser
+journalctl --user -u tui-browser -f    # tail logs
+```
 
 </details>
 
