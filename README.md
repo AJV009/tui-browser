@@ -111,6 +111,16 @@ The install script handles:
 
 After install, the dashboard is at `http://<tailscale-ip>:7483`. Add additional servers via the wrench icon in the dashboard header.
 
+### Service Management
+
+```bash
+systemctl --user start tui-browser
+systemctl --user stop tui-browser
+systemctl --user restart tui-browser
+systemctl --user status tui-browser
+journalctl --user -u tui-browser -f    # tail logs
+```
+
 ### Manual Start (without systemd)
 
 ```bash
@@ -529,20 +539,6 @@ tui-browser/
 │   └── bundle-vscode-icons.sh    # One-time vscode-icons build script
 ├── install.sh                # One-command setup
 └── package.json
-```
-
-</details>
-
-<details>
-<summary><h3>Service Management</h3></summary>
-
-```bash
-# TUI Browser server
-systemctl --user start tui-browser
-systemctl --user stop tui-browser
-systemctl --user restart tui-browser
-systemctl --user status tui-browser
-journalctl --user -u tui-browser -f    # tail logs
 ```
 
 </details>
