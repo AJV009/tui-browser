@@ -282,7 +282,7 @@ Connect to `/ws/terminal/:sessionName`:
 ```
 tui-browser/
 ├── server/
-│   ├── index.js              # HTTP/HTTPS + WebSocket server orchestrator
+│   ├── index.js              # HTTP + WebSocket server orchestrator
 │   ├── routes.js             # All REST API route handlers
 │   ├── state.js              # Persistent state (display titles, locks)
 │   ├── ai-titles.js          # AI title generation via Claude CLI
@@ -366,7 +366,7 @@ If the [Claude CLI](https://claude.com/claude-code) is installed, sessions can b
 Phone/Tablet/Laptop Browser              Machine A (primary)          Machine B (remote)
 ┌──────────────────────────┐            ┌──────────────────────┐    ┌──────────────────────┐
 │  Dashboard               │            │  Node.js Server      │    │  Node.js Server      │
-│  ┌─ HOST ──────────────┐ │   HTTPS    │  ├── REST API        │    │  ├── REST API        │
+│  ┌─ HOST ──────────────┐ │   HTTP     │  ├── REST API        │    │  ├── REST API        │
 │  │ Sessions from A     │ │◄══════════►│  ├── WebSocket       │    │  ├── WebSocket       │
 │  └─────────────────────┘ │ Tailscale  │  ├── tmux discovery  │    │  ├── tmux discovery  │
 │  ┌─ LAPTOP ────────────┐ │ WireGuard  │  ├── serves frontend │    │  ├── /api/identity   │
@@ -432,7 +432,7 @@ Every tool in this space either **creates new sessions** or **requires you to go
 | **Session persistence** | Dies when browser tab closes | tmux session persists forever — reconnect anytime |
 | **TUI rendering (60fps)** | Varies — often broken through SSH layers | Native — raw PTY via node-pty + WebGL xterm.js |
 
-**Why WebSocket instead of SSH for transport?** SSH multiplexes its own channels and requires key/password auth on every connection — overhead that adds nothing when the server and terminal are on the same machine. WebSocket gives us raw bidirectional binary streaming over HTTPS with custom input batching (30ms buffer), JSON control messages for resize/attach/detach, and reconnection logic that SSH can't express. The browser connects to a local node-pty process that attaches to tmux — there's no remote host to SSH into.
+**Why WebSocket instead of SSH for transport?** SSH multiplexes its own channels and requires key/password auth on every connection — overhead that adds nothing when the server and terminal are on the same machine. WebSocket gives us raw bidirectional binary streaming over HTTP with custom input batching (30ms buffer), JSON control messages for resize/attach/detach, and reconnection logic that SSH can't express. The browser connects to a local node-pty process that attaches to tmux — there's no remote host to SSH into.
 
 <details>
 <summary><strong>Alternatives comparison</strong> — how every major tool in this space differs</summary>

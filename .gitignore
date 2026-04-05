@@ -3,6 +3,9 @@ package-lock.json
 .DS_Store
 docs/prompt.txt
 certs/
+*.crt
+*.key
+*.pem
 data/
 !data/shortcuts.sample.json
 public/shortcuts.json

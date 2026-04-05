@@ -1,13 +1,11 @@
 #!/usr/bin/env node
 /**
- * TUI Browser Server — HTTP + HTTPS + WebSocket orchestrator.
+ * TUI Browser Server — HTTP + WebSocket orchestrator.
  * Routes, state, and AI titles are in separate modules.
  */
 
 const path = require('path');
 const http = require('http');
-const https = require('https');
-const fs = require('fs');
 const express = require('express');
 const { WebSocketServer } = require('ws');
 const discovery = require('./discovery');
@@ -19,7 +17,6 @@ const routes = require('./routes');
 const fileRoutes = require('./file-routes');
 
 const PORT = parseInt(process.env.PORT || process.argv[2], 10) || 3000;
-const HTTPS_PORT = parseInt(process.env.HTTPS_PORT, 10) || PORT + 1;
 const BIND = (process.env.BIND || '').trim() || null;
 const PKG_VERSION = require('../package.json').version;
 const BUILD_ID = Date.now().toString(36);
@@ -65,7 +62,7 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 
 routes.setup(app, {
   discovery, sessions, kittyDiscovery, state, aiTitles,
-  config: { PORT, HTTPS_PORT, FULL_VERSION, BUILD_ID },
+  config: { PORT, FULL_VERSION, BUILD_ID },
 });
 fileRoutes.setup(app);
 const serversConfig = require('./servers');
@@ -73,20 +70,9 @@ serversConfig.setupRoutes(app);
 const selfUpdate = require('./update');
 selfUpdate.setupRoutes(app);
 
-// ---------- HTTP + HTTPS ----------
+// ---------- HTTP ----------
 
 const server = http.createServer(app);
-
-let httpsServer = null;
-const certPath = path.join(__dirname, '..', 'certs', 'server.crt');
-const keyPath = path.join(__dirname, '..', 'certs', 'server.key');
-try {
-  if (fs.existsSync(certPath) && fs.existsSync(keyPath)) {
-    httpsServer = https.createServer({ cert: fs.readFileSync(certPath), key: fs.readFileSync(keyPath) }, app);
-  }
-} catch {
-  console.warn('[server] HTTPS certs not found — HTTPS disabled.');
-}
 
 // ---------- WebSocket ----------
 
@@ -99,7 +85,6 @@ function handleWsUpgrade(req, socket, head) {
 }
 
 server.on('upgrade', handleWsUpgrade);
-if (httpsServer) httpsServer.on('upgrade', handleWsUpgrade);
 
 wss.on('connection', (ws, sessionName) => {
   let cols = 80, rows = 24, attached = false;
@@ -140,19 +125,12 @@ wss.on('connection', (ws, sessionName) => {
     const addr = BIND || '0.0.0.0';
     console.log(`TUI Browser listening on http://${addr}:${PORT}`);
   });
-  if (httpsServer) {
-    const httpsBindArgs = BIND ? [HTTPS_PORT, BIND] : [HTTPS_PORT];
-    httpsServer.listen(...httpsBindArgs, () => {
-      const addr = BIND || '0.0.0.0';
-      console.log(`TUI Browser HTTPS on https://${addr}:${HTTPS_PORT}`);
-    });
-  }
 
   function gracefulShutdown(signal) {
     console.log(`${signal} received — shutting down gracefully...`);
     sessions.shutdown();
     wss.close();
-    server.close(() => { if (httpsServer) httpsServer.close(); process.exit(0); });
+    server.close(() => process.exit(0));
     const t = setTimeout(() => process.exit(1), 5000);
     t.unref();
   }

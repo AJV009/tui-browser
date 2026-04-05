@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-TUI Browser is a browser-based terminal control system — "VNC for terminals." It provides web access to tmux sessions from any device via HTTPS/WebSocket. The host terminal (Kitty) and web browser stay synchronized through tmux's native multi-client support.
+TUI Browser is a browser-based terminal control system — "VNC for terminals." It provides web access to tmux sessions from any device via HTTP/WebSocket over Tailscale. The host terminal (Kitty) and web browser stay synchronized through tmux's native multi-client support.
 
 ## Commands
 
@@ -15,18 +15,15 @@ npm install
 # Run the server (default port 3000)
 npm start
 
-# Run on specific port (HTTP on PORT, HTTPS on PORT+1)
+# Run on specific port
 PORT=7483 npm start
 
-# Full setup (deps + tmux config + systemd service + certs)
+# Full setup (deps + tmux config + systemd service)
 ./install.sh
 
 # Service management
 systemctl --user start|stop|restart|status tui-browser
 journalctl --user -u tui-browser -f
-
-# Generate HTTPS certs for local fast-path
-./scripts/generate-certs.sh
 ```
 
 There is no test suite, linter, or build step. Test API changes against the running server (e.g., `curl localhost:7483/api/discover`).
@@ -37,7 +34,7 @@ There is no test suite, linter, or build step. Test API changes against the runn
 
 ### Server (`server/`)
 
-- **index.js** — HTTP/HTTPS server + WebSocket upgrade handler. Entry point.
+- **index.js** — HTTP server + WebSocket upgrade handler. Entry point.
 - **routes.js** — All REST API endpoints (discovery, session CRUD, bulk-kill, AI titles, shortcuts, locks).
 - **session-manager.js** — PTY lifecycle. Spawns `tmux attach-session` via node-pty, broadcasts output to all connected WebSocket clients. Multiple browsers share one PTY process per session.
 - **discovery.js** — Queries tmux via `tmux list-sessions -F` with `|||`-separated format strings (avoids JSON parsing issues). Also runs unified discovery (tmux + Kitty in parallel).
@@ -53,7 +50,7 @@ Zero-build vanilla JS SPA. xterm.js loaded from CDN. Each JS file is a self-cont
 
 - **index.html** — SPA shell with two views: `#dashboard-view` and `#terminal-view`
 - **app.js** — Hash-based router (`#dashboard` or `#terminal/<sessionName>`), modal/toast system, version polling
-- **app-network.js** — Auto-switches between Cloudflare tunnel and direct local HTTPS (races local IPs against tunnel)
+- **app-network.js** — Auto-switches between Cloudflare tunnel and direct local connection (races local IPs against tunnel)
 - **dashboard.js** — Session card rendering, connect/kill/rename actions, 3s polling via `/api/discover`
 - **dashboard-shortcuts.js** — Quick Launch dropdown (loads/saves `shortcuts.json`)
 - **dashboard-bulk-kill.js** — Multi-select + bulk kill with filter presets
