@@ -513,6 +513,27 @@ TUI Browser sits in a unique spot: it's a **stateless web bridge to your existin
 
 ---
 
+<details>
+<summary><strong>FAQ</strong></summary>
+
+### Symlinks in the file browser point outside my allowed roots — why can't I open them?
+
+The file browser resolves symlinks to their **real path** before checking access. If a symlink inside `$HOME` points to `/opt/something`, the resolved path must fall within one of your configured `allowedRoots` in `data/file-browser-config.json` — otherwise access is denied.
+
+This is intentional: symlinks should not be an escape hatch out of the allowed directory sandbox. To fix it, add the symlink's target directory to your `allowedRoots`:
+
+```json
+{
+  "allowedRoots": ["$HOME", "/opt/something"]
+}
+```
+
+Then restart the server.
+
+</details>
+
+---
+
 ## License
 
 [AGPL-3.0](LICENSE) — free to use, modify, and distribute. If you modify it and offer it as a network service, you must open-source your modifications under the same license.

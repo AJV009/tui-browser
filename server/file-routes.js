@@ -97,7 +97,7 @@ function setup(app) {
         const stat = await fs.stat(fullPath);
         items.push({
           name: entry.name,
-          type: entry.isDirectory() ? 'directory' : 'file',
+          type: stat.isDirectory() ? 'directory' : 'file',
           size: stat.size,
           modified: stat.mtime.toISOString(),
           permissions: '0' + (stat.mode & 0o777).toString(8),
