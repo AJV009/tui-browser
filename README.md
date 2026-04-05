@@ -10,10 +10,11 @@
 </p>
 
 <p align="center">
-  <a href="#quick-start">Quick Start</a> &middot;
   <a href="#features">Features</a> &middot;
+  <a href="#quick-start">Quick Start</a> &middot;
+  <a href="#security">Security</a> &middot;
   <a href="#how-it-works">How It Works</a> &middot;
-  <a href="#why-not-just-ssh">Why Not SSH?</a>
+  <a href="#gotchas--tips">Gotchas & Tips</a>
 </p>
 
 ---
@@ -166,6 +167,55 @@ Drop a `tui.json` file in any project directory to customize sessions launched f
 
 **How it works:** Scripts that launch sessions (e.g., via Quick Launch) write/update `tui.json` before starting. The server records each session's origin CWD at creation time and checks for `tui.json` there during every discovery cycle (cached by mtime). Later, other tools (like Claude Code skills) can update the same file to add actions — changes appear within 3 seconds.
 
+## Security
+
+**This tool gives full shell access and filesystem access from a browser.** Do not expose it to the public internet or untrusted networks without understanding the risks. Use a VPN like Tailscale to restrict access to trusted devices only.
+
+TUI Browser binds exclusively to the Tailscale network interface. It is unreachable from the public internet or local LAN — only devices on your Tailscale network can connect.
+
+**Defense layers:**
+- **Network isolation** — server binds to Tailscale IP only (`BIND` env var)
+- **WireGuard encryption** — all traffic encrypted end-to-end by Tailscale
+- **Device authentication** — only devices you approve on your Tailscale account can reach the server
+- **No exposed ports** — nothing listens on public or LAN interfaces
+
+**Recommended firewall rules** (defense in depth):
+```bash
+# Block tui-browser ports on all non-Tailscale interfaces
+sudo ufw deny 7483
+sudo ufw deny 7484
+```
+
+<details>
+<summary><h3>Network Access using Tailscale (recommended)</h3></summary>
+
+TUI Browser requires [Tailscale](https://tailscale.com/) for network access. Tailscale creates an encrypted mesh VPN — the server binds exclusively to its Tailscale IP and is invisible to the public internet and local LAN.
+
+**Setup:**
+
+1. Install Tailscale on all machines: https://tailscale.com/download
+2. Run `tailscale up` and authenticate
+3. Run `./install.sh` — it auto-detects the Tailscale IP and binds to it
+
+**Access from any device:**
+- Install the Tailscale app (Android, iOS, macOS, Windows, Linux)
+- Join the same Tailscale network
+- Open `http://<tailscale-ip>:7483` in your browser
+
+**MagicDNS:** Tailscale assigns each machine a hostname like `machine-name.tailnet-name.ts.net`. Use these instead of raw IPs.
+
+**Custom domain (optional):** Point a DNS A record to the Tailscale IP (e.g., `tui.yourdomain.com` → `100.x.x.x`). Set the record to **DNS only** (not proxied) in your DNS provider. The domain resolves globally but only Tailscale devices can connect.
+
+#### Additional Machine Setup
+
+After running `./install.sh` on a new machine, a few extra steps may be needed:
+
+**File browser icons:** The vscode-icons SVGs are gitignored and generated locally. If the file browser shows no icons, regenerate with `bash scripts/bundle-vscode-icons.sh` (requires npm in PATH).
+
+**Node.js via nvm:** If using nvm instead of Volta or system Node, ensure the systemd unit can find Node. Check that `ExecStart` in `~/.config/systemd/user/tui-browser.service` points to the correct Node binary and `PATH` includes your nvm bin directory.
+
+</details>
+
 ## How It Works
 
 ```
@@ -221,7 +271,8 @@ Each machine runs its own independent tui-browser server. The primary server hos
 
 3. **Add the server** in the primary's dashboard via the wrench icon, using the machine's Tailscale IP or MagicDNS hostname.
 
-## Why Not Just SSH?
+<details>
+<summary><h2>Why Not Just SSH?</h2></summary>
 
 Every tool in this space either **creates new sessions** or **requires you to go through it**. TUI Browser does neither — it discovers your running tmux sessions and gives you a web view into them. The terminal sessions are the source of truth; the web layer is a lens, not a replacement.
 
@@ -315,6 +366,8 @@ Both are designed for multi-user access governance, not personal terminal mirror
 
 TUI Browser sits in a unique spot: it's a **stateless web bridge to your existing terminal sessions** — it discovers running tmux sessions, exposes them over WebSocket, and lets multiple clients attach without configuration. The terminal sessions are the source of truth; the web layer is a view into them, not a replacement. No other tool does this.
 
+</details>
+
 ---
 
 ## Gotchas & Tips
@@ -366,59 +419,7 @@ The terminal view includes touch-optimized controls:
 ---
 
 <details>
-<summary><strong>Network Access (Tailscale)</strong></summary>
-
-TUI Browser requires [Tailscale](https://tailscale.com/) for network access. Tailscale creates an encrypted mesh VPN — the server binds exclusively to its Tailscale IP and is invisible to the public internet and local LAN.
-
-**Setup:**
-
-1. Install Tailscale on all machines: https://tailscale.com/download
-2. Run `tailscale up` and authenticate
-3. Run `./install.sh` — it auto-detects the Tailscale IP and binds to it
-
-**Access from any device:**
-- Install the Tailscale app (Android, iOS, macOS, Windows, Linux)
-- Join the same Tailscale network
-- Open `http://<tailscale-ip>:7483` in your browser
-
-**MagicDNS:** Tailscale assigns each machine a hostname like `machine-name.tailnet-name.ts.net`. Use these instead of raw IPs.
-
-**Custom domain (optional):** Point a DNS A record to the Tailscale IP (e.g., `tui.yourdomain.com` → `100.x.x.x`). Set the record to **DNS only** (not proxied) in your DNS provider. The domain resolves globally but only Tailscale devices can connect.
-
-### Additional Machine Setup
-
-After running `./install.sh` on a new machine, a few extra steps may be needed:
-
-**File browser icons:** The vscode-icons SVGs are gitignored and generated locally. If the file browser shows no icons, regenerate with `bash scripts/bundle-vscode-icons.sh` (requires npm in PATH).
-
-**Node.js via nvm:** If using nvm instead of Volta or system Node, ensure the systemd unit can find Node. Check that `ExecStart` in `~/.config/systemd/user/tui-browser.service` points to the correct Node binary and `PATH` includes your nvm bin directory.
-
-</details>
-
-<details>
-<summary><strong>Security</strong></summary>
-
-**This tool gives full shell access and filesystem access from a browser.**
-
-TUI Browser binds exclusively to the Tailscale network interface. It is unreachable from the public internet or local LAN — only devices on your Tailscale network can connect.
-
-**Defense layers:**
-- **Network isolation** — server binds to Tailscale IP only (`BIND` env var)
-- **WireGuard encryption** — all traffic encrypted end-to-end by Tailscale
-- **Device authentication** — only devices you approve on your Tailscale account can reach the server
-- **No exposed ports** — nothing listens on public or LAN interfaces
-
-**Recommended firewall rules** (defense in depth):
-```bash
-# Block tui-browser ports on all non-Tailscale interfaces
-sudo ufw deny 7483
-sudo ufw deny 7484
-```
-
-</details>
-
-<details>
-<summary><strong>API Reference</strong></summary>
+<summary><h3>API Reference</h3></summary>
 
 ### REST
 
@@ -475,7 +476,7 @@ Connect to `/ws/terminal/:sessionName`:
 </details>
 
 <details>
-<summary><strong>Project Structure</strong></summary>
+<summary><h3>Project Structure</h3></summary>
 
 ```
 tui-browser/
@@ -533,7 +534,7 @@ tui-browser/
 </details>
 
 <details>
-<summary><strong>Service Management</strong></summary>
+<summary><h3>Service Management</h3></summary>
 
 ```bash
 # TUI Browser server
