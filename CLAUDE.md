@@ -39,10 +39,15 @@ There is no test suite, linter, or build step. Test API changes against the runn
 - **session-manager.js** — PTY lifecycle. Spawns `tmux attach-session` via node-pty, broadcasts output to all connected WebSocket clients. Multiple browsers share one PTY process per session.
 - **discovery.js** — Queries tmux via `tmux list-sessions -F` with `|||`-separated format strings (avoids JSON parsing issues). Also runs unified discovery (tmux + Kitty in parallel).
 - **kitty-discovery.js** — Discovers Kitty windows via `kitten @ ls` JSON protocol over Unix socket. Used for discovery/metadata only — actual terminal I/O always goes through tmux.
-- **state.js** — Persistent state (display titles, locked sessions) saved to `data/` directory.
+- **state.js** — Persistent state (display titles, locked sessions, idle expiry, origin CWDs, input history, notes) saved to `data/` directory.
 - **ai-titles.js** — Auto-generates session titles via Claude CLI every 60s.
 - **exec-util.js** — Subprocess wrapper with 5s timeout used by all `execFile` calls.
 - **file-routes.js** — File browser REST API. All endpoints under `/api/files/*` — list, read, write, upload, download, mkdir, rename, delete, move, copy, cwd. Path traversal prevention via configurable allowed roots (`data/file-browser-config.json`).
+- **servers.js** — Multi-server configuration management. Reads/writes `data/servers.json` for the frontend server list.
+- **update.js** — Self-update endpoint (`/api/update`). Pulls latest code from git, runs npm install, restarts via systemd.
+- **tui-overrides.js** — Discovers and caches `tui.json` override files. A `tui.json` in a session's origin CWD provides custom titles, action buttons, and file browser CWD overrides.
+- **identity.js** — Server identity and version info. Reads/writes `data/identity.json`.
+- **claude-detect.js** — Detects Claude Code sessions and whether remote-control is enabled.
 
 ### Frontend (`public/`)
 
@@ -50,13 +55,16 @@ Zero-build vanilla JS SPA. xterm.js loaded from CDN. Each JS file is a self-cont
 
 - **index.html** — SPA shell with two views: `#dashboard-view` and `#terminal-view`
 - **app.js** — Hash-based router (`#dashboard` or `#terminal/<sessionName>`), modal/toast system, version polling
-- **app-network.js** — Auto-switches between Cloudflare tunnel and direct local connection (races local IPs against tunnel)
+- **server-manager.js** — Multi-server connection manager. Fetches server list, resolves best connection per server, aggregates discovery. HOST renders first, remotes fill in as they resolve.
+- **settings-panel.js** — Server settings overlay for adding/editing/removing servers.
 - **dashboard.js** — Session card rendering, connect/kill/rename actions, 3s polling via `/api/discover`
 - **dashboard-shortcuts.js** — Quick Launch dropdown (loads/saves `shortcuts.json`)
 - **dashboard-bulk-kill.js** — Multi-select + bulk kill with filter presets
 - **dashboard-info.js** — Session info overlay (memory, CPU, process tree)
 - **terminal.js** — xterm.js setup + WebSocket connection (binary terminal data)
 - **terminal-controls.js** — Scroll controls, text selection overlay, quick-keys bar, session rename/kill
+- **terminal-text-input.js** — Compose-and-send text panel for reliable mobile input. Manages quickbar visibility and draft auto-save.
+- **terminal-notes.js** — Sent history panel (per-session input history) + Notes overlay (persistent global scratchpad).
 - **file-browser.js** — File browser overlay with Google Files-style navigation, breadcrumbs, vscode-icons, context menu, selection mode, directory picker
 - **file-editor.js** — CodeMirror 6 wrapper for viewing/editing text files with syntax highlighting
 - **file-upload.js** — FilePond wrapper for drag-and-drop file uploads
