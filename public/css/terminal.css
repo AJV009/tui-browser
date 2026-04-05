@@ -174,11 +174,6 @@
 
 .qk-dot.active { background: var(--accent); }
 
-/* Anchor separator */
-.qk-anchor-sep {
-  width: 1px; align-self: stretch; margin: 4px 0; background: var(--border); flex-shrink: 0;
-}
-
 /* Key buttons */
 .qk {
   flex: 1; height: 44px; border: 1px solid var(--border); border-radius: 6px;
@@ -188,8 +183,6 @@
 }
 
 .qk:active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
-.qk-accent { background: var(--accent-dim); color: var(--accent); border-color: var(--accent-dim); flex: 0 0 44px; }
-.qk.active { background: var(--accent); color: var(--bg); border-color: var(--accent); }
 
 /* ========== Scroll Controls ========== */
 .scroll-controls {
@@ -256,6 +249,40 @@
 
 .text-input-pill-btn:active { background: var(--accent-dim); color: var(--accent); }
 .text-input-pill-btn.active { background: var(--accent-dim); color: var(--accent); border-color: var(--accent); }
+
+/* ========== Sel Pill ========== */
+.sel-pill {
+  display: flex; flex-direction: column; align-items: center;
+  border: 1px solid var(--border-hover); border-radius: 6px;
+  background: var(--surface-hover); overflow: hidden;
+}
+
+.sel-pill-btn {
+  width: 32px; height: 32px; border: none; background: transparent; color: var(--text);
+  font-family: var(--mono); font-size: 10px; font-weight: 700;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+  user-select: none; transition: background 0.1s;
+}
+
+.sel-pill-btn:active { background: var(--accent-dim); color: var(--accent); }
+
+/* ========== Pen Pill ========== */
+.pen-pill {
+  display: flex; flex-direction: column; align-items: center;
+  border: 1px solid var(--border-hover); border-radius: 6px;
+  background: var(--surface-hover); overflow: hidden;
+}
+
+.pen-pill-btn {
+  width: 32px; height: 32px; border: none; background: transparent; color: var(--text);
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+  user-select: none; transition: background 0.1s;
+}
+
+.pen-pill-btn:active { background: var(--accent-dim); color: var(--accent); }
+.pen-pill-btn.active { background: var(--accent-dim); color: var(--accent); }
 
 /* ========== Files Pill ========== */
 .files-pill {
@@ -459,7 +486,6 @@
   .terminal-toolbar { padding: 6px 10px; }
   .terminal-quickbar.quickbar-open { padding-bottom: max(5px, env(safe-area-inset-bottom)); }
   .qk { height: 46px; font-size: 15px; }
-  .qk-accent { flex: 0 0 46px; }
   .text-input-body textarea { font-size: 16px; }
   .sent-history-panel { max-height: 45vh; }
   .notes-item { padding: 12px 14px; min-height: 44px; }
